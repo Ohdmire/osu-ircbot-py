@@ -1,0 +1,4 @@
+configparser==7.0.0
+irc==20.4.0
+requests==2.31.0
+rosu-pp-py==1.0.0
