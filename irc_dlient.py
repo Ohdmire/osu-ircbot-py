@@ -499,6 +499,13 @@ class MyIRCClient:
             b.get_beatmap_info()
             r.send_msg(connection, event, b.return_beatmap_info())
 
+        if text == "!about":
+            r.send_msg(connection, event,
+                       "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
+        if text == "！about":
+            r.send_msg(connection, event,
+                       "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
+
 
 # 定义玩家类
 class Player:
@@ -661,7 +668,7 @@ class Room:
             print("未保存当前房间ID")
 
     def help(self):
-        return r'!queue 查看队列 | !abort 投票丢弃游戏 | !start 投票开始游戏 | !skip 投票跳过房主 | !pr 查询最近成绩 | !s 查询当前谱面bp | !m+{MODS} 查询谱面模组PP| !i 返回当前谱面信息| !ttl 查询剩余时间 | !close 投票关闭(1min后自动重启)房间 | help 查看帮助'
+        return r'!queue 查看队列 | !abort 投票丢弃游戏 | !start 投票开始游戏 | !skip 投票跳过房主 | !pr 查询最近成绩 | !s 查询当前谱面bp | !m+{MODS} 查询谱面模组PP| !i 返回当前谱面信息| !ttl 查询剩余时间 | !close 投票关闭(1min后自动重启)房间 | help 查看帮助 | !about 关于机器人'
 
     def change_room_id(self, id):
         self.room_id = id
