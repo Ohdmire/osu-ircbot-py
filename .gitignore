@@ -1,3 +1,4 @@
 *.ini
-last_room.txt
+last_room_id.txt
 test*
+data.json

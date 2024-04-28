@@ -104,6 +104,13 @@ class MyIRCClient:
         r.close_last_room(connection, event)
         r.create_room(connection, event)
 
+        def send_loop():
+            while True:
+                message = input()
+                r.send_msg(connection, event, message)
+
+        threading.Thread(target=(send_loop)).start()
+
     def on_privmsg(self, connection, event):
         # 打印接收到的私人消息
         print(f"收到私人消息  {event.source.split('!')[0]}:{event.arguments[0]}")
@@ -207,7 +214,7 @@ class MyIRCClient:
                     return
                 if b.check_beatmap_if_out_of_time():
                     r.send_msg(connection, event,
-                               f'{b.beatmap_length}s>{config.timelimit}*s 请重新选择')
+                               f'{b.beatmap_length}s>{config.timelimit}s 请重新选择')
                     r.change_beatmap_to(connection, event, last_beatmap_id)
                     b.change_beatmap_id(last_beatmap_id)
                     return
