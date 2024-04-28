@@ -27,6 +27,7 @@ password = 你的irc密码
 
 [OSU]
 starlimit = 0 #超星限制0默认无限制
+timelimit = 0 #谱面长度限制0默认无限制 单位s
 mpname = 你的mp房名字
 mppassword = 你的mp房密码
 ```

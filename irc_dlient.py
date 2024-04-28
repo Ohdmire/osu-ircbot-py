@@ -33,6 +33,7 @@ class Config:
         self.osupassword = self.config['OSUAPI']['password']
         self.mpname = self.config['OSU']['mpname']
         self.starlimit = self.config['OSU']['starlimit']
+        self.timelimit = self.config['OSU']['timelimit']
         self.mppassword = self.config['OSU']['mppassword']
 
 
@@ -200,7 +201,13 @@ class MyIRCClient:
 
                 if b.check_beatmap_if_out_of_star():
                     r.send_msg(connection, event,
-                               f'{b.beatmap_star}*>5.7* 请重新选择')
+                               f'{b.beatmap_star}*>{config.starlimit}* 请重新选择')
+                    r.change_beatmap_to(connection, event, last_beatmap_id)
+                    b.change_beatmap_id(last_beatmap_id)
+                    return
+                if b.check_beatmap_if_out_of_time():
+                    r.send_msg(connection, event,
+                               f'{b.beatmap_length}s>{config.timelimit}*s 请重新选择')
                     r.change_beatmap_to(connection, event, last_beatmap_id)
                     b.change_beatmap_id(last_beatmap_id)
                     return
@@ -287,101 +294,37 @@ class MyIRCClient:
         # 玩家发送的消息响应部分
 
         # 投票丢弃游戏
-        if text == "!abort":
-            p.vote_for_abort(connection, event)
-        if text == "！abort":
-            p.vote_for_abort(connection, event)
-        if text == "!ABORT":
-            p.vote_for_abort(connection, event)
-        if text == "！ABORT":
+        if text in ["!abort", "！abort", "!ABORT", "！ABORT"]:
             p.vote_for_abort(connection, event)
 
         # 投票开始游戏
-        if text == "!start":
-            p.vote_for_start(connection, event)
-        if text == "！start":
-            p.vote_for_start(connection, event)
-        if text == "!START":
-            p.vote_for_start(connection, event)
-        if text == "！START":
+        if text in ["!start", "！start", "!START", "！START"]:
             p.vote_for_start(connection, event)
 
         # 投票跳过房主
-        if text == "!skip":
-            p.vote_for_host_rotate(connection, event)
-        if text == "！skip":
-            p.vote_for_host_rotate(connection, event)
-        if text == "!SKIP":
-            p.vote_for_host_rotate(connection, event)
-        if text == "！SKIP":
+        if text in ["!skip", "！skip", "!SKIP", "！SKIP"]:
             p.vote_for_host_rotate(connection, event)
 
         # 投票关闭房间s
-        if text == "!close":
-            p.vote_for_close_room(connection, event)
-        if text == "！close":
-            p.vote_for_close_room(connection, event)
-        if text == "!CLOSE":
-            p.vote_for_close_room(connection, event)
-        if text == "！CLOSE":
+        if text in ["!close", "！close", "!CLOSE", "！CLOSE"]:
             p.vote_for_close_room(connection, event)
 
         # 查看队列
-        if text == "!queue":
-            p.convert_host()
-            r.send_msg(connection, event, str(
-                f'当前队列：{p.room_host_list_apprence_final}'))
-        if text == "！queue":
-            p.convert_host()
-            r.send_msg(connection, event, str(
-                f'当前队列：{p.room_host_list_apprence_final}'))
-        if text == "!QUEUE":
-            p.convert_host()
-            r.send_msg(connection, event, str(
-                f'当前队列：{p.room_host_list_apprence_final}'))
-        if text == "！QUEUE":
+        if text in ["!queue", "！queue", "!QUEUE", "！QUEUE"]:
             p.convert_host()
             r.send_msg(connection, event, str(
                 f'当前队列：{p.room_host_list_apprence_final}'))
 
         # 帮助
-        if text == "help":
-            r.send_msg(connection, event, r.help())
-        if text == "HELP":
+        if text in ["help", "HELP", "!help", "！help", "!HELP", "！HELP"]:
             r.send_msg(connection, event, r.help())
 
         # ping
-        if text == "ping":
+        if text in ["ping", "PING", "!ping", "！ping", "!PING", "！PING"]:
             r.send_msg(connection, event, r'pong')
-        if text == "PING":
-            r.send_msg(connection, event, r'PONG')
 
         # 快速查询成绩
-        if text == "!pr":
-            b.get_user_id(event.source.split('!')[0])
-            detail_1 = b.get_recent_info(event.source.split('!')[0])
-            pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
-            detail_2 = pp.calculate_pp_obj(
-                mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
-            r.send_msg(connection, event, detail_1)
-            r.send_msg(connection, event, detail_2)
-        if text == "！pr":
-            b.get_user_id(event.source.split('!')[0])
-            detail_1 = b.get_recent_info(event.source.split('!')[0])
-            pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
-            detail_2 = pp.calculate_pp_obj(
-                mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
-            r.send_msg(connection, event, detail_1)
-            r.send_msg(connection, event, detail_2)
-        if text == "!PR":
-            b.get_user_id(event.source.split('!')[0])
-            detail_1 = b.get_recent_info(event.source.split('!')[0])
-            pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
-            detail_2 = pp.calculate_pp_obj(
-                mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
-            r.send_msg(connection, event, detail_1)
-            r.send_msg(connection, event, detail_2)
-        if text == "！PR":
+        if text in ["!pr", "！pr", "!PR", "！PR", "!p", "！p", "!P", "！P"]:
             b.get_user_id(event.source.split('!')[0])
             detail_1 = b.get_recent_info(event.source.split('!')[0])
             pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
@@ -391,31 +334,7 @@ class MyIRCClient:
             r.send_msg(connection, event, detail_2)
 
         # 快速当前谱面成绩
-        if text == "!s":
-            b.get_user_id(event.source.split('!')[0])
-            s = b.get_beatmap_score(event.source.split('!')[0])
-            r.send_msg(connection, event, s)
-            if s.find("未查询到") == -1:
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_obj(
-                    mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
-        if text == "！s":
-            b.get_user_id(event.source.split('!')[0])
-            s = b.get_beatmap_score(event.source.split('!')[0])
-            r.send_msg(connection, event, s)
-            if s.find("未查询到") == -1:
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_obj(
-                    mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
-        if text == "!S":
-            b.get_user_id(event.source.split('!')[0])
-            s = b.get_beatmap_score(event.source.split('!')[0])
-            r.send_msg(connection, event, s)
-            if s.find("未查询到") == -1:
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_obj(
-                    mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
-        if text == "！S":
+        if text in ["!s", "！s", "!S", "！S"]:
             b.get_user_id(event.source.split('!')[0])
             s = b.get_beatmap_score(event.source.split('!')[0])
             r.send_msg(connection, event, s)
@@ -451,38 +370,42 @@ class MyIRCClient:
             pp.get_beatmap_file(beatmap_id=b.beatmap_id)
             r.send_msg(connection, event, pp.calculate_pp_fully(
                 pp.cal_mod_int(new_mods_list)))
-        if text == "!m":
+
+        if text.find("！M+") != -1:
+            try:
+                modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+            except:
+                modslist = ""
+            new_mods_list = []
+            # 循环遍历字符串，步长为2
+            for i in range(0, len(modslist), 2):
+                # 每次取两个字符，并添加到列表中
+                new_mods_list.append(modslist[i:i+2])
             pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-            r.send_msg(connection, event,
-                       pp.calculate_pp_fully(pp.cal_mod_int([])))
-        if text == "!M":
+            r.send_msg(connection, event, pp.calculate_pp_fully(
+                pp.cal_mod_int(new_mods_list)))
+
+        if text.find("！M+") != -1:
+            try:
+                modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+            except:
+                modslist = ""
+            new_mods_list = []
+            # 循环遍历字符串，步长为2
+            for i in range(0, len(modslist), 2):
+                # 每次取两个字符，并添加到列表中
+                new_mods_list.append(modslist[i:i+2])
+            pp.get_beatmap_file(beatmap_id=b.beatmap_id)
+            r.send_msg(connection, event, pp.calculate_pp_fully(
+                pp.cal_mod_int(new_mods_list)))
+
+        if text in ["!m", "！m", "!M", "！M"]:
             pp.get_beatmap_file(beatmap_id=b.beatmap_id)
             r.send_msg(connection, event,
                        pp.calculate_pp_fully(pp.cal_mod_int([])))
 
         # 快速获取剩余时间 大约10s游戏延迟
-        if text == "!ttl":
-            if b.beatmap_length != "" and r.game_start_time != "":
-                timeleft = int(b.beatmap_length)+10 - \
-                    int((datetime.now()-r.game_start_time).seconds)
-                r.send_msg(connection, event, str(f'剩余游玩时间：{timeleft}s'))
-            else:
-                r.send_msg(connection, event, str(f'剩余游玩时间：未知'))
-        if text == "！ttl":
-            if b.beatmap_length != "" and r.game_start_time != "":
-                timeleft = int(b.beatmap_length)+10 - \
-                    int((datetime.now()-r.game_start_time).seconds)
-                r.send_msg(connection, event, str(f'剩余游玩时间：{timeleft}s'))
-            else:
-                r.send_msg(connection, event, str(f'剩余游玩时间：未知'))
-        if text == "!TTL":
-            if b.beatmap_length != "" and r.game_start_time != "":
-                timeleft = int(b.beatmap_length)+10 - \
-                    int((datetime.now()-r.game_start_time).seconds)
-                r.send_msg(connection, event, str(f'剩余游玩时间：{timeleft}s'))
-            else:
-                r.send_msg(connection, event, str(f'剩余游玩时间：未知'))
-        if text == "！TTL":
+        if text in ["!ttl", "！ttl", "!TTL", "！TTL"]:
             if b.beatmap_length != "" and r.game_start_time != "":
                 timeleft = int(b.beatmap_length)+10 - \
                     int((datetime.now()-r.game_start_time).seconds)
@@ -490,19 +413,12 @@ class MyIRCClient:
             else:
                 r.send_msg(connection, event, str(f'剩余游玩时间：未知'))
 
-        if text == "!i":
-            b.get_token()
-            b.get_beatmap_info()
-            r.send_msg(connection, event, b.return_beatmap_info())
-        if text == "！i":
+        if text in ["!i", "！i"]:
             b.get_token()
             b.get_beatmap_info()
             r.send_msg(connection, event, b.return_beatmap_info())
 
-        if text == "!about":
-            r.send_msg(connection, event,
-                       "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
-        if text == "！about":
+        if text in ["!about", "！about", "!ABOUT", "！ABORT"]:
             r.send_msg(connection, event,
                        "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
 
@@ -668,7 +584,7 @@ class Room:
             print("未保存当前房间ID")
 
     def help(self):
-        return r'!queue 查看队列 | !abort 投票丢弃游戏 | !start 投票开始游戏 | !skip 投票跳过房主 | !pr 查询最近成绩 | !s 查询当前谱面bp | !m+{MODS} 查询谱面模组PP| !i 返回当前谱面信息| !ttl 查询剩余时间 | !close 投票关闭(1min后自动重启)房间 | help 查看帮助 | !about 关于机器人'
+        return r'!queue(!q) 查看队列 | !abort 投票丢弃游戏 | !start 投票开始游戏 | !skip 投票跳过房主 | !pr(!p) 查询最近成绩 | !s 查询当前谱面bp | !m+{MODS} 查询谱面模组PP| !i 返回当前谱面信息| !ttl 查询剩余时间 | !close 投票关闭(1min后自动重启)房间 | help 查看帮助 | !about 关于机器人'
 
     def change_room_id(self, id):
         self.room_id = id
@@ -849,6 +765,14 @@ class Beatmap:
         if float(config.starlimit) == 0:
             return False
         if self.beatmap_star > float(config.starlimit):
+            return True
+        else:
+            return False
+
+    def check_beatmap_if_out_of_time(self):
+        if float(config.timelimit) == 0:
+            return False
+        if self.beatmap_length > float(config.timelimit):
             return True
         else:
             return False
