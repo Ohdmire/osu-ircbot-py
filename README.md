@@ -7,7 +7,7 @@
 # 教程
 安装Python和必要运行库
 ```python
-pip install -r requirements
+pip install -r requirements.txt
 ```
 
 运行程序
