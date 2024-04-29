@@ -106,7 +106,7 @@ class MyIRCClient:
 
         def send_loop():
             while True:
-                message = input()
+                message = input(":>")
                 r.send_msg(connection, event, message)
 
         threading.Thread(target=(send_loop)).start()
@@ -660,14 +660,14 @@ class Beatmap:
         self.beatmap_songs_id = ""
         self.beatmap_name = ""
         self.beatmap_artist = ""
-        self.beatmap_star = ""
+        self.beatmap_star = 0
         self.beatmap_status = ""
         self.beatemap_bpm = ""
         self.beatmap_cs = ""
         self.beatmap_ar = ""
         self.beatmap_od = ""
         self.beatmap_hp = ""
-        self.beatmap_length = ""
+        self.beatmap_length = 0
         self.beatmap_ranked_date = ""
         self.beatmatp_submit_date = ""
         self.beatmap_mirror_sayo_url = ""
@@ -751,14 +751,14 @@ class Beatmap:
             self.beatmap_name = "获取地图信息失败"
             self.beatmap_songs_id = ""
             self.beatmap_artist = ""
-            self.beatmap_star = ""
+            self.beatmap_star = 0
             self.beatmap_status = ""
             self.beatemap_bpm = ""
             self.beatmap_cs = ""
             self.beatmap_ar = ""
             self.beatmap_od = ""
             self.beatmap_hp = ""
-            self.beatmap_length = ""
+            self.beatmap_length = 0
             self.beatmap_ranked_date = ""
             self.beatmap_mirror_sayo_url = ""
             self.beatmap_mirror_inso_url = ""
