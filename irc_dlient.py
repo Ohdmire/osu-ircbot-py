@@ -188,7 +188,7 @@ class MyIRCClient:
                 print(f'玩家队列{p.player_list}')
                 # 输出
                 self.export_json()
-            # 地图变化
+            # 谱面变化
             if text.find("Beatmap changed to") != -1:
                 # 尝试
                 try:
@@ -202,7 +202,7 @@ class MyIRCClient:
                 if last_beatmap_id == "":
                     last_beatmap_id = "3459231"
                 b.change_beatmap_id(beatmap_id)
-                # 获取地图信息
+                # 获取谱面信息
                 b.get_token()
                 b.get_beatmap_info()
 
@@ -641,14 +641,14 @@ class Room:
 
     def change_beatmap_to(self, connection, event, beatmapid):
         connection.privmsg(self.room_id, "!mp map "+beatmapid)
-        print("更换地图为"+beatmapid)
+        print("更换谱面为"+beatmapid)
 
     def change_mods_to_FM(self, connection, event):
         connection.privmsg(self.room_id, "!mp mods FreeMod")
         print("开启Freemod")
 
 
-# 定义地图类
+# 定义谱面类
 
 
 class Beatmap:
@@ -747,8 +747,8 @@ class Beatmap:
             self.beatmap_mirror_inso_url = "http://inso.link/yukiho/?b="+self.beatmap_id
             self.beatmap_osudirect_url = response.json()['url']
         except:
-            print("获取地图信息失败")
-            self.beatmap_name = "获取地图信息失败"
+            print("获取谱面信息失败")
+            self.beatmap_name = "获取谱面信息失败"
             self.beatmap_songs_id = ""
             self.beatmap_artist = ""
             self.beatmap_star = 0
@@ -766,7 +766,7 @@ class Beatmap:
 
     def change_beatmap_id(self, id):
         self.beatmap_id = id
-        print(f'更换地图ID为 {self.beatmap_id}')
+        print(f'更换谱面ID为 {self.beatmap_id}')
 
     def check_beatmap_if_out_of_star(self):
         if float(config.starlimit) == 0:
