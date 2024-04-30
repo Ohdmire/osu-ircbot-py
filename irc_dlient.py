@@ -960,8 +960,8 @@ class Beatmap:
             response.raise_for_status()  # 如果请求失败，这将抛出一个异常
 
             self.pr_beatmap_id = response.json()[0]['beatmap']['id']
-            self.pr_title = response.json()[0]['beatmapset']['title']
-            self.pr_artist = response.json()[0]['beatmapset']['artist']
+            self.pr_title = response.json()[0]['beatmapset']['title_unicode']
+            self.pr_artist = response.json()[0]['beatmapset']['artist_unicode']
             self.pr_star = response.json()[0]['beatmap']['difficulty_rating']
 
             self.pr_acc = response.json()[0]['accuracy']
