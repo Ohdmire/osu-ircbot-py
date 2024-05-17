@@ -106,7 +106,7 @@ class MyIRCClient:
 
         def send_loop():
             while True:
-                message = input(":>")
+                message = input(">")
                 r.send_msg(connection, event, message)
 
         threading.Thread(target=(send_loop)).start()
@@ -285,9 +285,11 @@ class MyIRCClient:
             # bancho重启
             if text.find("Bancho will be right back!") != -1:
                 if self.isrestart is False:
-                    r.send_msg(connection, event, "Bancho重启中，房间将在1min后自动重启")
                     self.isrestart = True
-                    time.sleep(120)
+                    r.send_msg(connection, event, "Bancho重启中，房间将在3min后自动重启")
+                    print(time.time())
+                    time.sleep(180)
+                    print(time.time())
                     # 重置
                     p.reset_player_list()
                     p.reset_host_list()
@@ -297,6 +299,7 @@ class MyIRCClient:
                     # 尝试重新创建房间
                     r.create_room(connection, event)
                     self.isrestart = False
+                    print(time.time())
 
         # 玩家发送的消息响应部分
 
@@ -457,13 +460,12 @@ class Player:
     def convert_host(self):
         try:
             self.room_host_list_apprence.clear()
-            self.room_host_list_apprence.append(self.room_host_list[0])
-            for i in self.room_host_list[1:]:
-                new_name = i[:1] + '\u202d' + i[1:]
+            for i in self.room_host_list:
+                new_name = f'[https://osu.ppy.sh/users/{i} {i}]'
                 self.room_host_list_apprence.append(new_name)
             self.room_host_list_apprence_final = ""
             for i in self.room_host_list_apprence:
-                self.room_host_list_apprence_final += "'"+i+"'"+"-->"
+                self.room_host_list_apprence_final += i + "-->"
             self.room_host_list_apprence_final = self.room_host_list_apprence_final[:-3]
 
         except:
@@ -1157,10 +1159,10 @@ class PP:
 
             # 计算cal的ar
 
-            self.afterar = attrs.ar
-            self.aftercs = attrs.cs
-            self.afterod = attrs.od
-            self.afterhp = attrs.hp
+            self.afterar = attrs.difficulty.ar
+            # self.aftercs = attrs.difficulty.cs
+            self.afterod = attrs.difficulty.od
+            self.afterhp = attrs.difficulty.hp
 
             # 计算if 95% pp
             max_perf.set_accuracy(95)
@@ -1203,7 +1205,8 @@ class PP:
                     self.tempmod = self.tempmod+i
 
             self.afterar = round(self.afterar, 1)
-            self.aftercs = round(self.aftercs, 1)
+            # self.aftercs = round(self.aftercs, 1)
+            self.afterarcs = "???"
             self.afterod = round(self.afterod, 1)
             self.afterhp = round(self.afterhp, 1)
 

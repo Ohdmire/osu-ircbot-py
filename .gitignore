@@ -2,3 +2,5 @@
 last_room_id.txt
 test*
 data.json
+*.osu
+*.osr
