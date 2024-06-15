@@ -461,7 +461,8 @@ class Player:
         try:
             self.room_host_list_apprence.clear()
             for i in self.room_host_list:
-                new_name = f'[https://osu.ppy.sh/users/{i} {i}]'
+                url_i = i.replace(" ", "%20")
+                new_name = f'[https://osu.ppy.sh/users/{url_i} {i}]'
                 self.room_host_list_apprence.append(new_name)
             self.room_host_list_apprence_final = ""
             for i in self.room_host_list_apprence:
@@ -1350,4 +1351,7 @@ pp = PP()
 
 
 client = MyIRCClient(osu_server, osu_port, osu_nickname, osu_password)
-client.start()
+try:
+    client.start()
+except Exception as e:
+    print(f'未知错误---------------------{e}')
