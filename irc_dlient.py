@@ -47,10 +47,25 @@ class MyIRCClient:
         self.irc_react.add_global_handler("pubmsg", self.on_pubmsg)
         self.irc_react.add_global_handler("privmsg", self.on_privmsg)
         self.timer = None  # 定义定时器
-        self.isrestart = False
+        self.restarting_task = threading.Thread(target=(self.restart))
 
     def start(self):
         self.irc_react.process_forever()
+
+    def reset_all(self):
+        # 重置
+        p.reset_player_list()
+        p.reset_host_list()
+        p.clear_approved_list()
+        b.clear_cache()
+
+    def restart(self):
+        print(f'尝试重启...{datetime.now()+datetime.timedelta(hours=8)}')
+        time.sleep(120)
+        self.reset_all()
+        r.create_room(self.server, "")
+        self.restarting_task = threading.Thread(target=(self.restart))
+        print(f'重启完成{datetime.now()+datetime.timedelta(hours=8)}')
 
     # 定义定时任务,每60s执行一次,检查房间状态
     def start_periodic_task(self):
@@ -64,20 +79,23 @@ class MyIRCClient:
             except:
                 text = ""
             # match-disbanded #比赛关闭
-            if ("match-disbanded" in str(text['events'])) == True:
-                self.stop_periodic_task()
-                # 重置
-                p.reset_player_list()
-                p.reset_host_list()
-                p.clear_approved_list()
-                p.approved_host_rotate_list.clear()
-                b.clear_cache()
-                # 尝试重新创建房间
-                try:
-                    r.create_room(self.server, "")
-                except:
-                    print("创建房间失败")
-                    self.timer.start()
+            try:
+                if ("match-disbanded" in str(text['events'])) == True:
+                    self.stop_periodic_task()
+                    # 重置
+                    p.reset_player_list()
+                    p.reset_host_list()
+                    p.clear_approved_list()
+                    p.approved_host_rotate_list.clear()
+                    b.clear_cache()
+                    # 尝试重新创建房间
+                    try:
+                        r.create_room(self.server, "")
+                    except:
+                        print("创建房间失败")
+                        self.timer.start()
+            except:
+                print("无法判断比赛信息")
     # 停止定时任务
 
     def stop_periodic_task(self):
@@ -102,6 +120,7 @@ class MyIRCClient:
     def on_connect(self, connection, event):
         r.get_last_room_id()
         r.close_last_room(connection, event)
+        self.reset_all()
         r.create_room(connection, event)
 
         def send_loop():
@@ -138,7 +157,7 @@ class MyIRCClient:
             print(f"收到频道消息  {event.source.split('!')[0]}:{event.arguments[0]}")
             text = event.arguments[0]
             # 判断是否是banchobot发送的消息
-            if event.source.find("BanchoBot") != -1:
+            if event.source.find("BanchoBot") != -1 or event.source.find("ATRI1024") != -1:
                 # 加入房间
                 if text.find("joined in slot") != -1:
                     # 尝试
@@ -286,24 +305,9 @@ class MyIRCClient:
                     r.reset_game_start_time()
                 # bancho重启
                 if text.find("Bancho will be right back!") != -1:
-                    if self.isrestart is False:
-                        self.isrestart = True
-                        r.send_msg(connection, event,
-                                   "Bancho重启中，房间将在3min后自动重启")
-                        raise Exception("RestartingError")
-                        # print(time.time())
-                        # time.sleep(180)
-                        # print(time.time())
-                        # # 重置
-                        # p.reset_player_list()
-                        # p.reset_host_list()
-                        # p.clear_approved_list()
-                        # p.approved_host_rotate_list.clear()
-                        # b.clear_cache()
-                        # # 尝试重新创建房间
-                        # r.create_room(connection, event)
-                        # self.isrestart = False
-                        # print(time.time())
+                    r.send_msg(connection, event,
+                               "Bancho重启中，房间将在2min后自动重启")
+                    self.restarting_task.start()
 
             # 玩家发送的消息响应部分
 
@@ -437,7 +441,10 @@ class MyIRCClient:
                            "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
 
         except Exception as e:
-            print(f'-----------------未知错误---------------------{e}')
+            if str(e) == "threads can only be started once":
+                print("重启线程正在运行中")
+            else:
+                print(f'-----------------未知错误---------------------{e}')
 
 
 # 定义玩家类
@@ -1367,11 +1374,4 @@ pp = PP()
 
 
 client = MyIRCClient(osu_server, osu_port, osu_nickname, osu_password)
-try:
-    client.start()
-except Exception as e:
-    if e == "RestartingError":
-        time.sleep(180)
-        client.start()
-    else:
-        raise
+client.start()
