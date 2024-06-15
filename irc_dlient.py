@@ -133,304 +133,311 @@ class MyIRCClient:
             self.start_periodic_task()
 
     def on_pubmsg(self, connection, event):
-        # 打印接收到的消息
-        print(f"收到频道消息  {event.source.split('!')[0]}:{event.arguments[0]}")
-        text = event.arguments[0]
-        # 判断是否是banchobot发送的消息
-        if event.source.find("BanchoBot") != -1:
-            # 加入房间
-            if text.find("joined in slot") != -1:
-                # 尝试
-                try:
-                    playerid = re.findall(r'.*(?= joined in slot)', text)[0]
-                except:
-                    playerid = ""
-                print(f'玩家{playerid}加入房间')
-                # 发送欢迎消息
-                if "ATRI1024" not in playerid:
-                    if b.beatmap_length != "" and r.game_start_time != "":
-                        timeleft = int(b.beatmap_length)+10 - \
-                            int((datetime.now()-r.game_start_time).seconds)
-                        text_timeleft = f'| 剩余游玩时间：{timeleft}s 请主人耐心等待哦~'
-                    else:
-                        timeleft = 0
-                    text_Welcome = f'欢迎{playerid}酱~＼(≧▽≦)／ 输入help获取指令详情'
-                    if timeleft > 0:
+        try:
+            # 打印接收到的消息
+            print(f"收到频道消息  {event.source.split('!')[0]}:{event.arguments[0]}")
+            text = event.arguments[0]
+            # 判断是否是banchobot发送的消息
+            if event.source.find("BanchoBot") != -1:
+                # 加入房间
+                if text.find("joined in slot") != -1:
+                    # 尝试
+                    try:
+                        playerid = re.findall(
+                            r'.*(?= joined in slot)', text)[0]
+                    except:
+                        playerid = ""
+                    print(f'玩家{playerid}加入房间')
+                    # 发送欢迎消息
+                    if "ATRI1024" not in playerid:
+                        if b.beatmap_length != "" and r.game_start_time != "":
+                            timeleft = int(b.beatmap_length)+10 - \
+                                int((datetime.now()-r.game_start_time).seconds)
+                            text_timeleft = f'| 剩余游玩时间：{timeleft}s 请主人耐心等待哦~'
+                        else:
+                            timeleft = 0
+                        text_Welcome = f'欢迎{playerid}酱~＼(≧▽≦)／ 输入help获取指令详情'
+                        if timeleft > 0:
+                            r.send_msg(connection, event,
+                                       text_Welcome+text_timeleft)
+                        else:
+                            r.send_msg(connection, event, text_Welcome)
+                    # 如果第一次加入房间，更换房主，清空房主队列，设置FM
+                    if len(p.player_list) == 0:
+                        p.reset_host_list()
+                        r.change_host(connection, event, playerid)
+                        r.change_mods_to_FM(connection, event)
+                    # 加入房间队列，玩家队列
+                    p.add_host(playerid)
+                    p.add_player(playerid)
+                    print(f'玩家队列{p.player_list}')
+                    print(f'房主队列{p.room_host_list}')
+                    # 输出
+                    self.export_json()
+                # 离开房间
+                if text.find("left the game") != -1:
+                    # 尝试
+                    try:
+                        playerid = re.findall(r'.*(?= left the game)', text)[0]
+                    except:
+                        playerid = ""
+                    print(f'玩家{playerid}离开房间')
+                    # 不移除房主队列
+                    p.remove_player(playerid)
+                    # 房主离开立刻更换房主
+                    if playerid == p.room_host and len(p.player_list) != 0:
+                        p.host_rotate(connection, event)
+                    print(f'玩家队列{p.player_list}')
+                    # 输出
+                    self.export_json()
+                # 谱面变化
+                if text.find("Beatmap changed to") != -1:
+                    # 尝试
+                    try:
+                        beatmap_url = re.findall(r'(?<=\()\S+(?=\))', text)[0]
+                        beatmap_id = re.findall(r'\d+', beatmap_url)[0]
+                    except:
+                        beatmap_url = ""
+                        beatmap_id = ""
+
+                    last_beatmap_id = b.beatmap_id
+                    if last_beatmap_id == "":
+                        last_beatmap_id = "3459231"
+                    b.change_beatmap_id(beatmap_id)
+                    # 获取谱面信息
+                    b.get_token()
+                    b.get_beatmap_info()
+
+                    if b.check_beatmap_if_out_of_star():
                         r.send_msg(connection, event,
-                                   text_Welcome+text_timeleft)
-                    else:
-                        r.send_msg(connection, event, text_Welcome)
-                # 如果第一次加入房间，更换房主，清空房主队列，设置FM
-                if len(p.player_list) == 0:
-                    p.reset_host_list()
-                    r.change_host(connection, event, playerid)
-                    r.change_mods_to_FM(connection, event)
-                # 加入房间队列，玩家队列
-                p.add_host(playerid)
-                p.add_player(playerid)
-                print(f'玩家队列{p.player_list}')
-                print(f'房主队列{p.room_host_list}')
-                # 输出
-                self.export_json()
-            # 离开房间
-            if text.find("left the game") != -1:
-                # 尝试
-                try:
-                    playerid = re.findall(r'.*(?= left the game)', text)[0]
-                except:
-                    playerid = ""
-                print(f'玩家{playerid}离开房间')
-                # 不移除房主队列
-                p.remove_player(playerid)
-                # 房主离开立刻更换房主
-                if playerid == p.room_host and len(p.player_list) != 0:
-                    p.host_rotate(connection, event)
-                print(f'玩家队列{p.player_list}')
-                # 输出
-                self.export_json()
-            # 谱面变化
-            if text.find("Beatmap changed to") != -1:
-                # 尝试
-                try:
-                    beatmap_url = re.findall(r'(?<=\()\S+(?=\))', text)[0]
-                    beatmap_id = re.findall(r'\d+', beatmap_url)[0]
-                except:
-                    beatmap_url = ""
-                    beatmap_id = ""
+                                   f'{b.beatmap_star}*>{config.starlimit}* 请重新选择')
+                        r.change_beatmap_to(connection, event, last_beatmap_id)
+                        b.change_beatmap_id(last_beatmap_id)
+                        return
+                    if b.check_beatmap_if_out_of_time():
+                        r.send_msg(connection, event,
+                                   f'{b.beatmap_length}s>{config.timelimit}s 请重新选择')
+                        r.change_beatmap_to(connection, event, last_beatmap_id)
+                        b.change_beatmap_id(last_beatmap_id)
+                        return
 
-                last_beatmap_id = b.beatmap_id
-                if last_beatmap_id == "":
-                    last_beatmap_id = "3459231"
-                b.change_beatmap_id(beatmap_id)
-                # 获取谱面信息
-                b.get_token()
-                b.get_beatmap_info()
+                    r.send_msg(connection, event, b.return_beatmap_info())
+                    # 输出
+                    self.export_json()
 
-                if b.check_beatmap_if_out_of_star():
-                    r.send_msg(connection, event,
-                               f'{b.beatmap_star}*>{config.starlimit}* 请重新选择')
-                    r.change_beatmap_to(connection, event, last_beatmap_id)
-                    b.change_beatmap_id(last_beatmap_id)
-                    return
-                if b.check_beatmap_if_out_of_time():
-                    r.send_msg(connection, event,
-                               f'{b.beatmap_length}s>{config.timelimit}s 请重新选择')
-                    r.change_beatmap_to(connection, event, last_beatmap_id)
-                    b.change_beatmap_id(last_beatmap_id)
-                    return
+                # 房主变化
+                if text.find("became the host") != -1:
+                    # 尝试
+                    try:
+                        p.room_host = re.findall(
+                            r'.*(?= became the host)', text)[0]
+                    except:
+                        p.room_host = ""
+                    print(f'房主变为{p.room_host}')
 
-                r.send_msg(connection, event, b.return_beatmap_info())
-                # 输出
-                self.export_json()
+                # 准备就绪，开始游戏
+                if text.find("All players are ready") != -1:
+                    r.start_room(connection, event)
 
-            # 房主变化
-            if text.find("became the host") != -1:
-                # 尝试
-                try:
-                    p.room_host = re.findall(
-                        r'.*(?= became the host)', text)[0]
-                except:
-                    p.room_host = ""
-                print(f'房主变为{p.room_host}')
+                # 开始游戏
+                if text.find("The match has started") != -1:
+                    # 将房主队列第一个人移动到最后
+                    p.host_rotate_pending(connection, event)
+                    print(f'游戏开始，房主队列{p.room_host_list}')
+                    p.clear_approved_list()
+                    # 获取游戏开始时间
+                    r.set_game_start_time()
 
-            # 准备就绪，开始游戏
-            if text.find("All players are ready") != -1:
-                r.start_room(connection, event)
-
-            # 开始游戏
-            if text.find("The match has started") != -1:
-                # 将房主队列第一个人移动到最后
-                p.host_rotate_pending(connection, event)
-                print(f'游戏开始，房主队列{p.room_host_list}')
-                p.clear_approved_list()
-                # 获取游戏开始时间
-                r.set_game_start_time()
-
-            # 游戏结束,更换房主
-            if text.find("The match has finished") != -1:
-                # 对比房主队列,去除离开的玩家,更新房主队列
-                p.host_rotate(connection, event)
-                print(f'游戏结束，房主队列{p.room_host_list}')
-                # 换了房主以后立即清空投票列表
-                p.approved_host_rotate_list.clear()
-                p.clear_approved_list()
-                # 发送队列
-                p.convert_host()
-                r.send_msg(connection, event, str(
-                    f'当前队列：{p.room_host_list_apprence_final}'))
-                # 重置游戏开始时间
-                r.reset_game_start_time()
-
-            # 游戏被丢弃
-            if text.find("Aborted the match") != -1:
-                # 判断游戏是否结束
-                timeleft = int(b.beatmap_length)+10 - \
-                    int((datetime.now()-r.game_start_time).seconds)
-                if timeleft > 0:  # 大于0代表没打，先不更换房主，退回队列
-                    p.reverse_host_pending(connection, event)
-                    print("比赛被丢弃，房主队列退回")
-                else:  # 小于0代表已经打完，更换房主
+                # 游戏结束,更换房主
+                if text.find("The match has finished") != -1:
                     # 对比房主队列,去除离开的玩家,更新房主队列
                     p.host_rotate(connection, event)
-                print(f'游戏结束，房主队列{p.room_host_list}')
-                # 换了房主以后立即清空投票列表
-                p.approved_host_rotate_list.clear()
-                p.clear_approved_list()
-                # 发送队列
+                    print(f'游戏结束，房主队列{p.room_host_list}')
+                    # 换了房主以后立即清空投票列表
+                    p.approved_host_rotate_list.clear()
+                    p.clear_approved_list()
+                    # 发送队列
+                    p.convert_host()
+                    r.send_msg(connection, event, str(
+                        f'当前队列：{p.room_host_list_apprence_final}'))
+                    # 重置游戏开始时间
+                    r.reset_game_start_time()
+
+                # 游戏被丢弃
+                if text.find("Aborted the match") != -1:
+                    # 判断游戏是否结束
+                    timeleft = int(b.beatmap_length)+10 - \
+                        int((datetime.now()-r.game_start_time).seconds)
+                    if timeleft > 0:  # 大于0代表没打，先不更换房主，退回队列
+                        p.reverse_host_pending(connection, event)
+                        print("比赛被丢弃，房主队列退回")
+                    else:  # 小于0代表已经打完，更换房主
+                        # 对比房主队列,去除离开的玩家,更新房主队列
+                        p.host_rotate(connection, event)
+                    print(f'游戏结束，房主队列{p.room_host_list}')
+                    # 换了房主以后立即清空投票列表
+                    p.approved_host_rotate_list.clear()
+                    p.clear_approved_list()
+                    # 发送队列
+                    p.convert_host()
+                    r.send_msg(connection, event, str(
+                        f'当前队列：{p.room_host_list_apprence_final}'))
+                    # 重置游戏开始时间
+                    r.reset_game_start_time()
+                # bancho重启
+                if text.find("Bancho will be right back!") != -1:
+                    if self.isrestart is False:
+                        self.isrestart = True
+                        r.send_msg(connection, event,
+                                   "Bancho重启中，房间将在3min后自动重启")
+                        raise Exception("RestartingError")
+                        # print(time.time())
+                        # time.sleep(180)
+                        # print(time.time())
+                        # # 重置
+                        # p.reset_player_list()
+                        # p.reset_host_list()
+                        # p.clear_approved_list()
+                        # p.approved_host_rotate_list.clear()
+                        # b.clear_cache()
+                        # # 尝试重新创建房间
+                        # r.create_room(connection, event)
+                        # self.isrestart = False
+                        # print(time.time())
+
+            # 玩家发送的消息响应部分
+
+            # 投票丢弃游戏
+            if text in ["!abort", "！abort", "!ABORT", "！ABORT"]:
+                p.vote_for_abort(connection, event)
+
+            # 投票开始游戏
+            if text in ["!start", "！start", "!START", "！START"]:
+                p.vote_for_start(connection, event)
+
+            # 投票跳过房主
+            if text in ["!skip", "！skip", "!SKIP", "！SKIP"]:
+                p.vote_for_host_rotate(connection, event)
+
+            # 投票关闭房间s
+            if text in ["!close", "！close", "!CLOSE", "！CLOSE"]:
+                p.vote_for_close_room(connection, event)
+
+            # 查看队列
+            if text in ["!queue", "！queue", "!QUEUE", "！QUEUE"]:
                 p.convert_host()
                 r.send_msg(connection, event, str(
                     f'当前队列：{p.room_host_list_apprence_final}'))
-                # 重置游戏开始时间
-                r.reset_game_start_time()
-            # bancho重启
-            if text.find("Bancho will be right back!") != -1:
-                if self.isrestart is False:
-                    self.isrestart = True
-                    r.send_msg(connection, event, "Bancho重启中，房间将在3min后自动重启")
-                    print(time.time())
-                    time.sleep(180)
-                    print(time.time())
-                    # 重置
-                    p.reset_player_list()
-                    p.reset_host_list()
-                    p.clear_approved_list()
-                    p.approved_host_rotate_list.clear()
-                    b.clear_cache()
-                    # 尝试重新创建房间
-                    r.create_room(connection, event)
-                    self.isrestart = False
-                    print(time.time())
 
-        # 玩家发送的消息响应部分
+            # 帮助
+            if text in ["help", "HELP", "!help", "！help", "!HELP", "！HELP"]:
+                r.send_msg(connection, event, r.help())
 
-        # 投票丢弃游戏
-        if text in ["!abort", "！abort", "!ABORT", "！ABORT"]:
-            p.vote_for_abort(connection, event)
+            # ping
+            if text in ["ping", "PING", "!ping", "！ping", "!PING", "！PING"]:
+                r.send_msg(connection, event, r'pong')
 
-        # 投票开始游戏
-        if text in ["!start", "！start", "!START", "！START"]:
-            p.vote_for_start(connection, event)
+            # 快速查询成绩
+            if text in ["!pr", "！pr", "!PR", "！PR", "!p", "！p", "!P", "！P"]:
+                b.get_user_id(event.source.split('!')[0])
+                detail_1 = b.get_recent_info(event.source.split('!')[0])
+                pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
+                detail_2 = pp.calculate_pp_obj(
+                    mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
+                r.send_msg(connection, event, detail_1)
+                r.send_msg(connection, event, detail_2)
 
-        # 投票跳过房主
-        if text in ["!skip", "！skip", "!SKIP", "！SKIP"]:
-            p.vote_for_host_rotate(connection, event)
+            # 快速当前谱面成绩
+            if text in ["!s", "！s", "!S", "！S"]:
+                b.get_user_id(event.source.split('!')[0])
+                s = b.get_beatmap_score(event.source.split('!')[0])
+                r.send_msg(connection, event, s)
+                if s.find("未查询到") == -1:
+                    pp.get_beatmap_file(beatmap_id=b.beatmap_id)
+                    r.send_msg(connection, event, pp.calculate_pp_obj(
+                        mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
 
-        # 投票关闭房间s
-        if text in ["!close", "！close", "!CLOSE", "！CLOSE"]:
-            p.vote_for_close_room(connection, event)
-
-        # 查看队列
-        if text in ["!queue", "！queue", "!QUEUE", "！QUEUE"]:
-            p.convert_host()
-            r.send_msg(connection, event, str(
-                f'当前队列：{p.room_host_list_apprence_final}'))
-
-        # 帮助
-        if text in ["help", "HELP", "!help", "！help", "!HELP", "！HELP"]:
-            r.send_msg(connection, event, r.help())
-
-        # ping
-        if text in ["ping", "PING", "!ping", "！ping", "!PING", "！PING"]:
-            r.send_msg(connection, event, r'pong')
-
-        # 快速查询成绩
-        if text in ["!pr", "！pr", "!PR", "！PR", "!p", "！p", "!P", "！P"]:
-            b.get_user_id(event.source.split('!')[0])
-            detail_1 = b.get_recent_info(event.source.split('!')[0])
-            pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
-            detail_2 = pp.calculate_pp_obj(
-                mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
-            r.send_msg(connection, event, detail_1)
-            r.send_msg(connection, event, detail_2)
-
-        # 快速当前谱面成绩
-        if text in ["!s", "！s", "!S", "！S"]:
-            b.get_user_id(event.source.split('!')[0])
-            s = b.get_beatmap_score(event.source.split('!')[0])
-            r.send_msg(connection, event, s)
-            if s.find("未查询到") == -1:
+            # 快速查询谱面得分情况
+            if text.find("!m+") != -1:
+                try:
+                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                except:
+                    modslist = ""
+                new_mods_list = []
+                # 循环遍历字符串，步长为2
+                for i in range(0, len(modslist), 2):
+                    # 每次取两个字符，并添加到列表中
+                    new_mods_list.append(modslist[i:i+2])
                 pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_obj(
-                    mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
+                r.send_msg(connection, event, pp.calculate_pp_fully(
+                    pp.cal_mod_int(new_mods_list)))
+            if text.find("!M+") != -1:
+                try:
+                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                except:
+                    modslist = ""
+                new_mods_list = []
+                # 循环遍历字符串，步长为2
+                for i in range(0, len(modslist), 2):
+                    # 每次取两个字符，并添加到列表中
+                    new_mods_list.append(modslist[i:i+2])
+                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
+                r.send_msg(connection, event, pp.calculate_pp_fully(
+                    pp.cal_mod_int(new_mods_list)))
 
-        # 快速查询谱面得分情况
-        if text.find("!m+") != -1:
-            try:
-                modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
-            except:
-                modslist = ""
-            new_mods_list = []
-            # 循环遍历字符串，步长为2
-            for i in range(0, len(modslist), 2):
-                # 每次取两个字符，并添加到列表中
-                new_mods_list.append(modslist[i:i+2])
-            pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-            r.send_msg(connection, event, pp.calculate_pp_fully(
-                pp.cal_mod_int(new_mods_list)))
-        if text.find("!M+") != -1:
-            try:
-                modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
-            except:
-                modslist = ""
-            new_mods_list = []
-            # 循环遍历字符串，步长为2
-            for i in range(0, len(modslist), 2):
-                # 每次取两个字符，并添加到列表中
-                new_mods_list.append(modslist[i:i+2])
-            pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-            r.send_msg(connection, event, pp.calculate_pp_fully(
-                pp.cal_mod_int(new_mods_list)))
+            if text.find("！M+") != -1:
+                try:
+                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                except:
+                    modslist = ""
+                new_mods_list = []
+                # 循环遍历字符串，步长为2
+                for i in range(0, len(modslist), 2):
+                    # 每次取两个字符，并添加到列表中
+                    new_mods_list.append(modslist[i:i+2])
+                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
+                r.send_msg(connection, event, pp.calculate_pp_fully(
+                    pp.cal_mod_int(new_mods_list)))
 
-        if text.find("！M+") != -1:
-            try:
-                modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
-            except:
-                modslist = ""
-            new_mods_list = []
-            # 循环遍历字符串，步长为2
-            for i in range(0, len(modslist), 2):
-                # 每次取两个字符，并添加到列表中
-                new_mods_list.append(modslist[i:i+2])
-            pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-            r.send_msg(connection, event, pp.calculate_pp_fully(
-                pp.cal_mod_int(new_mods_list)))
+            if text.find("！M+") != -1:
+                try:
+                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                except:
+                    modslist = ""
+                new_mods_list = []
+                # 循环遍历字符串，步长为2
+                for i in range(0, len(modslist), 2):
+                    # 每次取两个字符，并添加到列表中
+                    new_mods_list.append(modslist[i:i+2])
+                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
+                r.send_msg(connection, event, pp.calculate_pp_fully(
+                    pp.cal_mod_int(new_mods_list)))
 
-        if text.find("！M+") != -1:
-            try:
-                modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
-            except:
-                modslist = ""
-            new_mods_list = []
-            # 循环遍历字符串，步长为2
-            for i in range(0, len(modslist), 2):
-                # 每次取两个字符，并添加到列表中
-                new_mods_list.append(modslist[i:i+2])
-            pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-            r.send_msg(connection, event, pp.calculate_pp_fully(
-                pp.cal_mod_int(new_mods_list)))
+            if text in ["!m", "！m", "!M", "！M"]:
+                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
+                r.send_msg(connection, event,
+                           pp.calculate_pp_fully(pp.cal_mod_int([])))
 
-        if text in ["!m", "！m", "!M", "！M"]:
-            pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-            r.send_msg(connection, event,
-                       pp.calculate_pp_fully(pp.cal_mod_int([])))
+            # 快速获取剩余时间 大约10s游戏延迟
+            if text in ["!ttl", "！ttl", "!TTL", "！TTL"]:
+                if b.beatmap_length != "" and r.game_start_time != "":
+                    timeleft = int(b.beatmap_length)+10 - \
+                        int((datetime.now()-r.game_start_time).seconds)
+                    r.send_msg(connection, event, str(f'剩余游玩时间：{timeleft}s'))
+                else:
+                    r.send_msg(connection, event, str(f'剩余游玩时间：未知'))
 
-        # 快速获取剩余时间 大约10s游戏延迟
-        if text in ["!ttl", "！ttl", "!TTL", "！TTL"]:
-            if b.beatmap_length != "" and r.game_start_time != "":
-                timeleft = int(b.beatmap_length)+10 - \
-                    int((datetime.now()-r.game_start_time).seconds)
-                r.send_msg(connection, event, str(f'剩余游玩时间：{timeleft}s'))
-            else:
-                r.send_msg(connection, event, str(f'剩余游玩时间：未知'))
+            if text in ["!i", "！i"]:
+                b.get_token()
+                b.get_beatmap_info()
+                r.send_msg(connection, event, b.return_beatmap_info())
 
-        if text in ["!i", "！i"]:
-            b.get_token()
-            b.get_beatmap_info()
-            r.send_msg(connection, event, b.return_beatmap_info())
+            if text in ["!about", "！about", "!ABOUT", "！ABORT"]:
+                r.send_msg(connection, event,
+                           "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
 
-        if text in ["!about", "！about", "!ABOUT", "！ABORT"]:
-            r.send_msg(connection, event,
-                       "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
+        except Exception as e:
+            print(f'-----------------未知错误---------------------{e}')
 
 
 # 定义玩家类
@@ -465,8 +472,17 @@ class Player:
                 new_name = f'[https://osu.ppy.sh/users/{url_i} {i}]'
                 self.room_host_list_apprence.append(new_name)
             self.room_host_list_apprence_final = ""
+            count = 1
             for i in self.room_host_list_apprence:
                 self.room_host_list_apprence_final += i + "-->"
+                count += 1
+                if count > 3:
+                    list_len = len(self.room_host_list_apprence)
+                    if count != 3:
+                        self.room_host_list_apprence_final += "-->" + \
+                            str(list_len - 3) + "players......" + "-->"
+                    self.room_host_list_apprence_final += self.room_host_list_apprence[-1] + "--->"
+                    break
             self.room_host_list_apprence_final = self.room_host_list_apprence_final[:-3]
 
         except:
@@ -1354,4 +1370,8 @@ client = MyIRCClient(osu_server, osu_port, osu_nickname, osu_password)
 try:
     client.start()
 except Exception as e:
-    print(f'未知错误---------------------{e}')
+    if e == "RestartingError":
+        time.sleep(180)
+        client.start()
+    else:
+        raise
