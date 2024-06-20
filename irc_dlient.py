@@ -441,10 +441,7 @@ class MyIRCClient:
                            "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
 
         except Exception as e:
-            if str(e) == "threads can only be started once":
-                print("重启线程正在运行中")
-            else:
-                print(f'-----------------未知错误---------------------{e}')
+            print(f'-----------------未知错误---------------------\n{e}')
 
 
 # 定义玩家类
