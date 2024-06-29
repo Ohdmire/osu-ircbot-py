@@ -483,8 +483,7 @@ class Player:
                 if count > 3:
                     list_len = len(self.room_host_list_apprence)
                     if count != 3:
-                        self.room_host_list_apprence_final += "-->" + \
-                            str(list_len - 3) + "players......" + "-->"
+                        self.room_host_list_apprence_final += str(list_len - 3) + "players......" + "-->"
                     self.room_host_list_apprence_final += self.room_host_list_apprence[-1] + "--->"
                     break
             self.room_host_list_apprence_final = self.room_host_list_apprence_final[:-3]
