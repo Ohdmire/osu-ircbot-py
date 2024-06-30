@@ -775,8 +775,8 @@ class Beatmap:
             self.beatmap_mirror_sayo_url = "https://osu.sayobot.cn/home?search="+self.beatmap_songs_id
             self.beatmap_mirror_inso_url = "http://inso.link/yukiho/?b="+self.beatmap_id
             self.beatmap_osudirect_url = response.json()['url']
-        except:
-            print("获取谱面信息失败")
+        except Exception as e:
+            print(f'获取谱面信息失败，原因：{e}')
             self.beatmap_name = "获取谱面信息失败"
             self.beatmap_songs_id = ""
             self.beatmap_artist = ""
@@ -957,8 +957,8 @@ class Beatmap:
             print(f"未查询到{username}在该谱面上留下的成绩")
             return f"未查询到{username}在该谱面上留下的成绩"
 
-        except:
-            print("获取谱面成绩失败")
+        except Exception as e:
+            print(f'获取谱面成绩失败，错误信息：{e}')
             self.pr_title = "获取谱面成绩失败"
             self.pr_artist = ""
             self.pr_star = ""
@@ -983,7 +983,7 @@ class Beatmap:
     def get_recent_info(self, username):
         try:
             user_id = self.id2name[username]
-            url = f'https://osu.ppy.sh/api/v2/users/{user_id}/scores/recent&include_fails=1'
+            url = f'https://osu.ppy.sh/api/v2/users/{user_id}/scores/recent?&include_fails=1'
             headers = {'Authorization': f'Bearer {self.osu_token}'}
             response = requests.get(url, headers=headers)
             response.raise_for_status()  # 如果请求失败，这将抛出一个异常
@@ -1020,8 +1020,8 @@ class Beatmap:
                 self.pr_mods_int = self.cal_mod_int(self.pr_mods)
                 self.pr_mods = tempmod
 
-        except:
-            print("获取最近成绩失败")
+        except Exception as e:
+            print(f'获取最近成绩失败，错误信息：{e}')
             self.pr_title = "获取最近成绩失败"
             self.pr_artist = ""
             self.pr_star = ""
@@ -1338,7 +1338,7 @@ class PP:
             self.fc99pp = round(self.fc99pp)
 
         except Exception as e:
-            print("计算pp失败")
+            print(f'计算pp失败: {e}')
             self.maxpp = 0
             self.maxaimpp = 0
             self.maxspeedpp = 0
