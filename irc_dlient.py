@@ -335,7 +335,7 @@ class MyIRCClient:
                     f'你前面剩余人数：{index}'))
 
             # 帮助
-            if text in ["help", "HELP", "!help", "！help", "!HELP", "！HELP"]:
+            if text in ["help", "HELP", "!help", "！help", "!HELP", "！HELP", "!h", "！h", "!H", "！H"]:
                 r.send_msg(connection, event, r.help())
 
             # ping
@@ -620,7 +620,7 @@ class Room:
             print("未保存当前房间ID")
 
     def help(self):
-        return r'!queue(!q) 查看队列 | !abort 投票丢弃游戏 | !start 投票开始游戏 | !skip 投票跳过房主 | !pr(!p) 查询最近成绩 | !s 查询当前谱面bp | !m+{MODS} 查询谱面模组PP| !i 返回当前谱面信息| !ttl 查询剩余时间 | !close 投票关闭(1min后自动重启)房间 | help 查看帮助 | !about 关于机器人'
+        return r'!queue(!q) 查看队列 | !abort 投票丢弃游戏 | !start 投票开始游戏 | !skip 投票跳过房主 | !pr(!p) 查询最近成绩 | !s 查询当前谱面bp | !m+{MODS} 查询谱面模组PP| !i 返回当前谱面信息| !ttl 查询剩余时间 | !close 投票关闭(1min后自动重启)房间 | help(!h) 查看帮助 | !about 关于机器人'
 
     def change_room_id(self, id):
         self.room_id = id
@@ -983,7 +983,7 @@ class Beatmap:
     def get_recent_info(self, username):
         try:
             user_id = self.id2name[username]
-            url = f'https://osu.ppy.sh/api/v2/users/{user_id}/scores/recent'
+            url = f'https://osu.ppy.sh/api/v2/users/{user_id}/scores/recent&include_fails=1'
             headers = {'Authorization': f'Bearer {self.osu_token}'}
             response = requests.get(url, headers=headers)
             response.raise_for_status()  # 如果请求失败，这将抛出一个异常
