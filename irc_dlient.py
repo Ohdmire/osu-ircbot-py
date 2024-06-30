@@ -327,11 +327,12 @@ class MyIRCClient:
             if text in ["!close", "！close", "!CLOSE", "！CLOSE"]:
                 p.vote_for_close_room(connection, event)
 
-            # 查看队列
-            if text in ["!queue", "！queue", "!QUEUE", "！QUEUE"]:
+            # 手动查看队列，就只返回前面剩余多少人
+            if text in ["!queue", "！queue", "!QUEUE", "！QUEUE", "!q", "！q", "!Q", "！Q"]:
                 p.convert_host()
+                index = p.remain_hosts_to_player(event.source.split('!')[0])
                 r.send_msg(connection, event, str(
-                    f'当前队列：{p.room_host_list_apprence_final}'))
+                    f'你前面剩余人数：{index}'))
 
             # 帮助
             if text in ["help", "HELP", "!help", "！help", "!HELP", "！HELP"]:
@@ -427,9 +428,9 @@ class MyIRCClient:
                 if b.beatmap_length != "" and r.game_start_time != "":
                     timeleft = int(b.beatmap_length)+10 - \
                         int((datetime.now()-r.game_start_time).seconds)
-                    r.send_msg(connection, event, str(f'剩余游玩时间：{timeleft}s'))
+                    r.send_msg(connection, event, f'剩余游玩时间：{timeleft}s')
                 else:
-                    r.send_msg(connection, event, str(f'剩余游玩时间：未知'))
+                    r.send_msg(connection, event, f'剩余游玩时间：未知')
 
             if text in ["!i", "！i"]:
                 b.get_token()
@@ -468,6 +469,11 @@ class Player:
         if name in self.room_host_list:
             self.room_host_list.remove(name)
 
+    def remain_hosts_to_player(self, name):
+        if name in self.room_host_list:
+            index = self.room_host_list.index(name)
+            return index
+
     def convert_host(self):
         try:
             self.room_host_list_apprence.clear()
@@ -476,17 +482,18 @@ class Player:
                 new_name = f'[https://osu.ppy.sh/users/{url_i} {i}]'
                 self.room_host_list_apprence.append(new_name)
             self.room_host_list_apprence_final = ""
-            count = 1
-            for i in self.room_host_list_apprence:
+            count = 0
+            total_count = len(self.room_host_list_apprence)
+            for i in self.room_host_list_apprence:  # 遍历列表
                 self.room_host_list_apprence_final += i + "-->"
                 count += 1
-                if count > 3:
-                    list_len = len(self.room_host_list_apprence)
-                    if count != 3:
-                        self.room_host_list_apprence_final += str(list_len - 3) + "players......" + "-->"
-                    self.room_host_list_apprence_final += self.room_host_list_apprence[-1] + "--->"
+                if count == 2:  # 如果已经显示过了2个，就直接加上 中间的还有多少个 和最后的一个
+                    if total_count != 3:  # 如果不是刚好三个人
+                        self.room_host_list_apprence_final += str(
+                            total_count - count - 1) + "players......" + "-->" + self.room_host_list_apprence[-1]
+                    else:  # 刚好3个人就不要 显示中间有多少人了
+                        self.room_host_list_apprence_final += self.room_host_list_apprence[-1]
                     break
-            self.room_host_list_apprence_final = self.room_host_list_apprence_final[:-3]
 
         except:
             print("房主队列为空")
@@ -1247,7 +1254,7 @@ class PP:
             self.afterod = 0
             self.afterhp = 0
 
-        return str(f'{self.tempmod}| {self.stars}*| {self.maxbeatmapcombo}x| ar:{self.afterar} cs:{self.aftercs} od:{self.afterod} hp:{self.afterhp} | SS:{self.maxpp}pp| 99%:{self.fc99pp}pp| 98%:{self.fc98pp}pp| 97%:{self.fc97pp}pp| 96%:{self.fc96pp}pp| 95%:{self.fc95pp}pp')
+        return f'{self.tempmod}| {self.stars}*| {self.maxbeatmapcombo}x| ar:{self.afterar} cs:{self.aftercs} od:{self.afterod} hp:{self.afterhp} | SS:{self.maxpp}pp| 99%:{self.fc99pp}pp| 98%:{self.fc98pp}pp| 97%:{self.fc97pp}pp| 96%:{self.fc96pp}pp| 95%:{self.fc95pp}pp'
 
     def calculate_pp_obj(self, mods, acc, misses, combo):
 
@@ -1351,7 +1358,7 @@ class PP:
             self.fc98pp = 0
             self.fc99pp = 0
 
-        return str(f'now:{self.currpp}pp| if FC({self.maxbeatmapcombo}x):{self.fcpp}pp| 95%:{self.fc95pp}pp| 96%:{self.fc96pp}pp| 97%:{self.fc97pp}pp| 98%:{self.fc98pp}pp| 99%:{self.fc99pp}pp| SS:{self.maxpp}pp| aim:{self.curraimpp}/{self.maxaimpp}pp| speed:{self.currspeedpp}/{self.maxspeedpp}pp| acc:{self.curraccpp}/{self.maxaccpp}pp')
+        return f'now:{self.currpp}pp| if FC({self.maxbeatmapcombo}x):{self.fcpp}pp| 95%:{self.fc95pp}pp| 96%:{self.fc96pp}pp| 97%:{self.fc97pp}pp| 98%:{self.fc98pp}pp| 99%:{self.fc99pp}pp| SS:{self.maxpp}pp| aim:{self.curraimpp}/{self.maxaimpp}pp| speed:{self.currspeedpp}/{self.maxspeedpp}pp| acc:{self.curraccpp}/{self.maxaccpp}pp'
 
 
 config = Config()
