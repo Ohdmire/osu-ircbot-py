@@ -473,6 +473,8 @@ class Player:
         if name in self.room_host_list:
             index = self.room_host_list.index(name)
             return index
+        else:
+            print(name, "is not in room_host_list", self.room_host_list)
 
     def convert_host(self):
         try:
@@ -482,18 +484,19 @@ class Player:
                 new_name = f'[https://osu.ppy.sh/users/{url_i} {i}]'
                 self.room_host_list_apprence.append(new_name)
             self.room_host_list_apprence_final = ""
-            count = 0
-            total_count = len(self.room_host_list_apprence)
-            for i in self.room_host_list_apprence:  # 遍历列表
-                self.room_host_list_apprence_final += i + "-->"
-                count += 1
-                if count == 2:  # 如果已经显示过了2个，就直接加上 中间的还有多少个 和最后的一个
-                    if total_count != 3:  # 如果不是刚好三个人
-                        self.room_host_list_apprence_final += str(
-                            total_count - count - 1) + "players......" + "-->" + self.room_host_list_apprence[-1]
-                    else:  # 刚好3个人就不要 显示中间有多少人了
-                        self.room_host_list_apprence_final += self.room_host_list_apprence[-1]
-                    break
+            list_len = len(self.room_host_list_apprence)
+            if list_len > 3:  # >3的情况 就是 player1 --> player2 --> x_otherplayers --> lastplayer
+                for i in self.room_host_list_apprence[0:1]:
+                    self.room_host_list_apprence_final += i
+                    self.room_host_list_apprence_final += "-->"
+                self.room_host_list_apprence_final += list_len - 3
+                self.room_host_list_apprence_final += " othersplayers -->"
+                self.room_host_list_apprence_final += self.room_host_list_apprence[-1]
+            else:
+                for i in self.room_host_list_apprence:
+                    self.room_host_list_apprence_final += i
+                    self.room_host_list_apprence_final += "-->"
+                self.room_host_list_apprence_final = self.room_host_list_apprence_final[:-3]
 
         except:
             print("房主队列为空")
