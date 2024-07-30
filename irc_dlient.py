@@ -484,13 +484,13 @@ class Player:
                 new_name = f'[https://osu.ppy.sh/users/{url_i} {i}]'
                 self.room_host_list_apprence.append(new_name)
             self.room_host_list_apprence_final = ""
-            list_len = len(self.room_host_list_apprence)
+            list_len = len(self.room_host_list)
             if list_len > 3:  # >3的情况 就是 player1 --> player2 --> x_otherplayers --> lastplayer
                 for i in self.room_host_list_apprence[0:1]:
                     self.room_host_list_apprence_final += i
                     self.room_host_list_apprence_final += "-->"
                 self.room_host_list_apprence_final += list_len - 3
-                self.room_host_list_apprence_final += " othersplayers -->"
+                self.room_host_list_apprence_final += " players -->"
                 self.room_host_list_apprence_final += self.room_host_list_apprence[-1]
             else:
                 for i in self.room_host_list_apprence:
