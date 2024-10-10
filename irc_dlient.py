@@ -101,7 +101,6 @@ class MyIRCClient:
                 p.approved_host_rotate_list.clear()
                 b.clear_cache()
                 print("开始重新创建房间")
-                # 尝试重新创建房间
                 try:
                     r.create_room(self.server, "")
                     print("创建房间成功")
@@ -111,10 +110,27 @@ class MyIRCClient:
                     self.timer.start()
                     return False
             else:
+                r.change_room_id(room_id)
                 return True
         except:
             print("无法判断比赛信息")
-            return False
+            print("房间已经关闭")
+            self.stop_periodic_task()
+            # 重置
+            p.reset_player_list()
+            p.reset_host_list()
+            p.clear_approved_list()
+            p.approved_host_rotate_list.clear()
+            b.clear_cache()
+            print("开始重新创建房间")
+            try:
+                r.create_room(self.server, "")
+                print("创建房间成功")
+                return True
+            except:
+                print("创建房间失败")
+                self.timer.start()
+                return False
 
     def export_json(self):
         result = {}
@@ -133,7 +149,6 @@ class MyIRCClient:
     def on_connect(self, connection, event):
         last_room_id = r.get_last_room_id()
         if self.check_room_status(last_room_id):
-            r.change_room_id(last_room_id)
             r.join_room(connection, event)
             r.change_password(connection, event)
             r.get_mp_settings(connection, event)
