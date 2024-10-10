@@ -81,9 +81,23 @@ class MyIRCClient:
             self.timer.cancel()
             self.timer = None
 
-    def check_room_status(self, room_id):
-        if room_id == "":
+    def check_last_room_status(self,last_room_id):
+        if last_room_id == "":
             return False
+        b.get_token()
+        try:
+            text = b.get_match_info(re.findall(r'\d+', last_room_id)[0])
+        except:
+            text = ""
+        # match-disbanded #比赛关闭
+        if "match-disbanded" in str(text['events']):
+            return False
+        else:
+            r.change_room_id(last_room_id)
+            return True
+
+    # 这是检查房间状态的流程 用于定时任务
+    def check_room_status(self, room_id):
         b.get_token()
         try:
             text = b.get_match_info(re.findall(r'\d+', room_id)[0])
@@ -92,7 +106,6 @@ class MyIRCClient:
         # match-disbanded #比赛关闭
         try:
             if ("match-disbanded" in str(text['events'])) == True:
-                print("房间已经关闭")
                 self.stop_periodic_task()
                 # 重置
                 p.reset_player_list()
@@ -100,37 +113,14 @@ class MyIRCClient:
                 p.clear_approved_list()
                 p.approved_host_rotate_list.clear()
                 b.clear_cache()
-                print("开始重新创建房间")
+                # 尝试重新创建房间
                 try:
                     r.create_room(self.server, "")
-                    print("创建房间成功")
-                    return True
                 except:
                     print("创建房间失败")
                     self.timer.start()
-                    return False
-            else:
-                r.change_room_id(room_id)
-                return True
         except:
             print("无法判断比赛信息")
-            print("房间已经关闭")
-            self.stop_periodic_task()
-            # 重置
-            p.reset_player_list()
-            p.reset_host_list()
-            p.clear_approved_list()
-            p.approved_host_rotate_list.clear()
-            b.clear_cache()
-            print("开始重新创建房间")
-            try:
-                r.create_room(self.server, "")
-                print("创建房间成功")
-                return True
-            except:
-                print("创建房间失败")
-                self.timer.start()
-                return False
 
     def export_json(self):
         result = {}
@@ -148,10 +138,16 @@ class MyIRCClient:
 
     def on_connect(self, connection, event):
         last_room_id = r.get_last_room_id()
-        if self.check_room_status(last_room_id):
+        
+        # 如果房间存在
+        if self.check_last_room_status(last_room_id):
             r.join_room(connection, event)
             r.change_password(connection, event)
             r.get_mp_settings(connection, event)
+        
+        # 如果房间不存在
+        else:
+            r.create_room(connection, event)
 
         def send_loop():
             while True:
@@ -182,6 +178,7 @@ class MyIRCClient:
             self.start_periodic_task()
 
     def on_pubmsg(self, connection, event):
+
         try:
             # 打印接收到的消息
             print(f"收到频道消息  {event.source.split('!')[0]}:{event.arguments[0]}")
@@ -239,6 +236,27 @@ class MyIRCClient:
                     print(f'玩家队列{p.player_list}')
                     # 输出
                     self.export_json()
+                # 修改 on_pubmsg 方法中处理玩家列表的部分
+                if text.find("Slot") != -1:
+                    players = re.findall(r'Slot \d+\s+(?:Not Ready|Ready)\s+(https://osu\.ppy\.sh/u/\d+\s+.+)', text)
+                    if players:
+                        for player_info in players:
+                            print(player_info)
+                            player_id = p.extract_player_name(player_info)
+                            if player_id:
+                                p.add_host(player_id)
+                                p.add_player(player_id)
+                        print(f'玩家队列{p.player_list}')
+                        print(f'房主队列{p.room_host_list}')
+                        # 输出
+                        self.export_json()
+                # 这个是加入房间后要把当前beatmap_id给change一下
+                if text.find("Beatmap:") != -1:
+                    match = re.search(r'https://osu\.ppy\.sh/b/(\d+)', text)
+                    if match:
+                        beatmap_id = match.group(1)
+                        b.change_beatmap_id(beatmap_id)
+
                 # 谱面变化
                 if text.find("Beatmap changed to") != -1:
                     # 尝试
@@ -338,19 +356,6 @@ class MyIRCClient:
                     r.send_msg(connection, event,
                                "Bancho重启中，房间将在2min后自动重启")
                     self.restarting_task.start()
-                if text.find("Slot") != -1:
-                    try:
-                        player_id = re.findall(r'\s*([A-Za-z\s]+)\s*(?=\s*\[|\s*$)', text)[0]
-                        player_id = player_id.rstrip()
-                    except:
-                        player_id = ""
-                    print(f'玩家{player_id}已经在房间中')
-                    p.add_host(player_id)
-                    p.add_player(player_id)
-                    print(f'玩家队列{p.player_list}')
-                    print(f'房主队列{p.room_host_list}')
-                    # 输出
-                    self.export_json()
 
             # 玩家发送的消息响应部分
 
@@ -391,7 +396,7 @@ class MyIRCClient:
                 detail_1 = b.get_recent_info(event.source.split('!')[0])
                 pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
                 detail_2 = pp.calculate_pp_obj(
-                    mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
+                    mods=b.pr_mods, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
                 r.send_msg(connection, event, detail_1)
                 r.send_msg(connection, event, detail_2)
 
@@ -403,68 +408,43 @@ class MyIRCClient:
                 if s.find("未查询到") == -1:
                     pp.get_beatmap_file(beatmap_id=b.beatmap_id)
                     r.send_msg(connection, event, pp.calculate_pp_obj(
-                        mods=b.pr_mods_int, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
+                        mods=b.pr_mods, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
 
             # 快速查询谱面得分情况
             if text.find("!m+") != -1:
                 try:
-                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
                 except:
-                    modslist = ""
-                new_mods_list = []
-                # 循环遍历字符串，步长为2
-                for i in range(0, len(modslist), 2):
-                    # 每次取两个字符，并添加到列表中
-                    new_mods_list.append(modslist[i:i+2])
+                    modslist_str = ""
                 pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(
-                    pp.cal_mod_int(new_mods_list)))
+                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
             if text.find("!M+") != -1:
                 try:
-                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
                 except:
-                    modslist = ""
-                new_mods_list = []
-                # 循环遍历字符串，步长为2
-                for i in range(0, len(modslist), 2):
-                    # 每次取两个字符，并添加到列表中
-                    new_mods_list.append(modslist[i:i+2])
+                    modslist_str = ""
                 pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(
-                    pp.cal_mod_int(new_mods_list)))
+                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
 
             if text.find("！M+") != -1:
                 try:
-                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
                 except:
-                    modslist = ""
-                new_mods_list = []
-                # 循环遍历字符串，步长为2
-                for i in range(0, len(modslist), 2):
-                    # 每次取两个字符，并添加到列表中
-                    new_mods_list.append(modslist[i:i+2])
+                    modslist_str = ""
                 pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(
-                    pp.cal_mod_int(new_mods_list)))
+                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
 
             if text.find("！M+") != -1:
                 try:
-                    modslist = re.findall(r'\+(.*)', event.arguments[0])[0]
+                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
                 except:
-                    modslist = ""
-                new_mods_list = []
-                # 循环遍历字符串，步长为2
-                for i in range(0, len(modslist), 2):
-                    # 每次取两个字符，并添加到列表中
-                    new_mods_list.append(modslist[i:i+2])
+                    modslist_str = ""
                 pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(
-                    pp.cal_mod_int(new_mods_list)))
+                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
 
             if text in ["!m", "！m", "!M", "！M"]:
                 pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event,
-                           pp.calculate_pp_fully(pp.cal_mod_int([])))
+                r.send_msg(connection, event,pp.calculate_pp_fully(''))
 
             # 快速获取剩余时间 大约10s游戏延迟
             if text in ["!ttl", "！ttl", "!TTL", "！TTL"]:
@@ -502,7 +482,8 @@ class Player:
         self.room_host = ""
 
     def add_player(self, name):
-        self.player_list.append(name)
+        if name not in self.player_list:
+            self.player_list.append(name)
 
     def add_host(self, name):
         if name not in self.room_host_list:
@@ -518,6 +499,16 @@ class Player:
             return index
         else:
             print(name, "is not in room_host_list", self.room_host_list)
+
+    def extract_player_name(self, text):
+        match = re.search(r'https://osu\.ppy\.sh/u/\d+\s*(.*)', text)
+        if match:
+            playername = match.group(1).strip()
+            if '[Host]' in playername:
+                playername = playername.replace('[Host]', '')
+                playername = playername.strip()
+            return playername
+        return ""
 
     def convert_host(self):
         try:
@@ -771,7 +762,6 @@ class Beatmap:
         self.pr_pp = 0
         self.pr_rank = ""
         self.pr_mods = ""
-        self.pr_mods_int = 0
 
         self.pr_username = ""
 
@@ -894,18 +884,6 @@ class Beatmap:
         except:
             print("获取用户ID失败")
 
-    def cal_mod_int(self, modname):
-        mod_int = 0
-        mod_list = ["NF", "EZ", "TD", "HD", "HR", "SD", "DT", "RX", "HT", "NC",
-                    "FL", "AT", "SO", "AP", "PF", "4K", "5K", "6K", "7K", "8K",
-                    "FI", "RD", "CM", "TP", "9K", "CO", "1K", "3K", "2K", "V2",
-                    "MR"]
-        for mod in modname:
-            if mod.upper() in mod_list:
-                mod_index = mod_list.index(mod.upper())
-                mod_int = mod_int | pow(2, mod_index)
-        return mod_int
-
     def get_beatmap_score(self, username):
         try:
             user_id = self.id2name[username]
@@ -937,17 +915,8 @@ class Beatmap:
 
             self.pr_acc = round(self.pr_acc*100, 2)
 
-            if self.pr_mods == []:
-                self.pr_mods = "NM"
-                self.pr_mods_int = 0
-            else:
-                tempmod = ""
-                for i in self.pr_mods:
-                    tempmod = tempmod+i
-                    # 获取mod数值
-                self.pr_mods_int = self.cal_mod_int(self.pr_mods)
-
-                self.pr_mods = tempmod
+            # if self.pr_mods == []:
+            #     self.pr_mods = "NM"
 
         except HTTPError:
             print(f"未查询到{username}在该谱面上留下的成绩")
@@ -1005,16 +974,8 @@ class Beatmap:
 
             self.pr_acc = round(self.pr_acc*100, 2)
 
-            if self.pr_mods == []:
-                self.pr_mods = "NM"
-                self.pr_mods_int = 0
-            else:
-                tempmod = ""
-                for i in self.pr_mods:
-                    tempmod = tempmod+i
-                    # 获取mod数值
-                self.pr_mods_int = self.cal_mod_int(self.pr_mods)
-                self.pr_mods = tempmod
+            # if self.pr_mods == []:
+            #     self.pr_mods = "NM"
 
         except Exception as e:
             print(f'获取最近成绩失败，错误信息：{e}')
@@ -1051,8 +1012,6 @@ class PP:
 
         self.stars = 0
 
-        self.modsnamelist = []
-
         self.maxpp = 0
         self.maxaimpp = 0
         self.maxspeedpp = 0
@@ -1075,7 +1034,6 @@ class PP:
         self.fc98pp = 0
         self.fc99pp = 0
 
-        self.tempmod = ""
 
     def get_beatmap_file(self, beatmap_id):
         self.beatmap_id = beatmap_id
@@ -1091,19 +1049,6 @@ class PP:
                     f.write(response.content)
             except:
                 print("获取谱面文件失败")
-
-    def  cal_mod_int(self, modname):
-        self.modsnamelist = modname
-        mod_int = 0
-        mod_list = ["NF", "EZ", "TD", "HD", "HR", "SD", "DT", "RX", "HT", "NC",
-                    "FL", "AT", "SO", "AP", "PF", "4K", "5K", "6K", "7K", "8K",
-                    "FI", "RD", "CM", "TP", "9K", "CO", "1K", "3K", "2K", "V2",
-                    "MR"]
-        for mod in modname:
-            if mod.upper() in mod_list:
-                mod_index = mod_list.index(mod.upper())
-                mod_int = mod_int | pow(2, mod_index)
-        return mod_int
 
     def calculate_pp_fully(self, mods):
         try:
@@ -1171,13 +1116,6 @@ class PP:
             self.fc99pp = round(self.fc99pp)
             self.stars = round(self.stars, 2)
 
-            if self.modsnamelist == []:
-                self.tempmod = "NM"
-            else:
-                self.tempmod = ""
-                for i in self.modsnamelist:
-                    self.tempmod = self.tempmod+i
-
             self.afterar = round(self.afterar, 1)
             self.aftercs = round(self.aftercs, 1)
             self.afterod = round(self.afterod, 1)
@@ -1185,7 +1123,6 @@ class PP:
 
         except:
             print("计算pp失败")
-            self.tempmod = "NM"
             self.maxpp = 0
             self.maxbeatmapcombo = 0
             self.fc95pp = 0
@@ -1200,7 +1137,7 @@ class PP:
             self.afterod = 0
             self.afterhp = 0
 
-        return f'{self.tempmod}| {self.stars}*| {self.maxbeatmapcombo}x| ar:{self.afterar} cs:{self.aftercs} od:{self.afterod} hp:{self.afterhp} | SS:{self.maxpp}pp| 99%:{self.fc99pp}pp| 98%:{self.fc98pp}pp| 97%:{self.fc97pp}pp| 96%:{self.fc96pp}pp| 95%:{self.fc95pp}pp'
+        return f'{self.mods}| {self.stars}*| {self.maxbeatmapcombo}x| ar:{self.afterar} cs:{self.aftercs} od:{self.afterod} hp:{self.afterhp} | SS:{self.maxpp}pp| 99%:{self.fc99pp}pp| 98%:{self.fc98pp}pp| 97%:{self.fc97pp}pp| 96%:{self.fc96pp}pp| 95%:{self.fc95pp}pp'
 
     def calculate_pp_obj(self, mods, acc, misses, combo):
 
@@ -1220,7 +1157,7 @@ class PP:
 
             self.maxaimpp = attrs.pp_aim
             self.maxspeedpp = attrs.pp_speed
-            self.maxaccpp = attrs.pp_acc
+            self.maxaccpp = attrs.pp_accuracy
 
             # 计算玩家的current performance
             max_perf.set_misses(misses)
@@ -1232,7 +1169,7 @@ class PP:
             self.curraccpp = curr_perf.pp
             self.curraimpp = curr_perf.pp_aim
             self.currspeedpp = curr_perf.pp_speed
-            self.curraccpp = curr_perf.pp_acc
+            self.curraccpp = curr_perf.pp_accuracy
 
             # 计算if fc pp
             max_perf.set_misses(0)
