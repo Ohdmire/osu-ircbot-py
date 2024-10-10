@@ -395,6 +395,7 @@ class MyIRCClient:
                 b.get_user_id(event.source.split('!')[0])
                 detail_1 = b.get_recent_info(event.source.split('!')[0])
                 pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
+                print(b.pr_mods)
                 detail_2 = pp.calculate_pp_obj(
                     mods=b.pr_mods, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
                 r.send_msg(connection, event, detail_1)
@@ -908,15 +909,13 @@ class Beatmap:
             self.pr_pp = response.json()['score']['pp']
             self.pr_rank = response.json()['score']['rank']
             self.pr_mods = response.json()['score']['mods']
+            self.pr_mods = "".join([str(mod) for mod in self.pr_mods])
 
             self.pr_beatmap_url = response.json()['score']['beatmap']['url']
 
             self.pr_username = username
 
             self.pr_acc = round(self.pr_acc*100, 2)
-
-            # if self.pr_mods == []:
-            #     self.pr_mods = "NM"
 
         except HTTPError:
             print(f"未查询到{username}在该谱面上留下的成绩")
@@ -967,15 +966,13 @@ class Beatmap:
             self.pr_pp = response.json()[0]['pp']
             self.pr_rank = response.json()[0]['rank']
             self.pr_mods = response.json()[0]['mods']
+            self.pr_mods = "".join([str(mod) for mod in self.pr_mods])
 
             self.pr_beatmap_url = response.json()[0]['beatmap']['url']
 
             self.pr_username = username
 
             self.pr_acc = round(self.pr_acc*100, 2)
-
-            # if self.pr_mods == []:
-            #     self.pr_mods = "NM"
 
         except Exception as e:
             print(f'获取最近成绩失败，错误信息：{e}')
@@ -1053,12 +1050,6 @@ class PP:
     def calculate_pp_fully(self, mods):
         try:
             self.mods = mods
-
-            # 没有maps文件夹时自动创建maps文件夹
-            maps_dir = os.path.join(os.getcwd(), './maps')
-            if not os.path.exists(maps_dir):
-                os.makedirs(maps_dir)
-                print(f"'{maps_dir}'文件夹不存在，已经自动创建")
 
             beatmap = rosu.Beatmap(path=f"./maps/{self.beatmap_id}.osu")
 
@@ -1243,6 +1234,11 @@ class PP:
 
         return f'now:{self.currpp}pp| if FC({self.maxbeatmapcombo}x):{self.fcpp}pp| 95%:{self.fc95pp}pp| 96%:{self.fc96pp}pp| 97%:{self.fc97pp}pp| 98%:{self.fc98pp}pp| 99%:{self.fc99pp}pp| SS:{self.maxpp}pp| aim:{self.curraimpp}/{self.maxaimpp}pp| speed:{self.currspeedpp}/{self.maxspeedpp}pp| acc:{self.curraccpp}/{self.maxaccpp}pp'
 
+# 没有maps文件夹时自动创建maps文件夹
+maps_dir = os.path.join(os.getcwd(), './maps')
+if not os.path.exists(maps_dir):
+    os.makedirs(maps_dir)
+    print(f"'{maps_dir}'文件夹不存在，已经自动创建")
 
 config = Config()
 
