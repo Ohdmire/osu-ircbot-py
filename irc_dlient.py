@@ -197,7 +197,7 @@ class MyIRCClient:
                     # 发送欢迎消息
                     if "ATRI1024" not in playerid:
                         if b.beatmap_length != "" and r.game_start_time != "":
-                            timeleft = int(b.beatmap_length)+10 -
+                            timeleft = int(b.beatmap_length)+10 - \
                                 int((datetime.now()-r.game_start_time).seconds)
                             text_timeleft = f'| 剩余游玩时间：{timeleft}s 请主人耐心等待哦~'
                         else:
@@ -332,7 +332,7 @@ class MyIRCClient:
                 # 游戏被丢弃
                 if text.find("Aborted the match") != -1:
                     # 判断游戏是否结束
-                    timeleft = int(b.beatmap_length)+10 -
+                    timeleft = int(b.beatmap_length)+10 - \
                         int((datetime.now()-r.game_start_time).seconds)
                     if timeleft > 0:  # 大于0代表没打，先不更换房主，退回队列
                         p.reverse_host_pending(connection, event)
@@ -449,7 +449,7 @@ class MyIRCClient:
             # 快速获取剩余时间 大约10s游戏延迟
             if text in ["!ttl", "！ttl", "!TTL", "！TTL"]:
                 if b.beatmap_length != "" and r.game_start_time != "":
-                    timeleft = int(b.beatmap_length)+10 -
+                    timeleft = int(b.beatmap_length)+10 - \
                         int((datetime.now()-r.game_start_time).seconds)
                     r.send_msg(connection, event, f'剩余游玩时间：{timeleft}s')
                 else:
