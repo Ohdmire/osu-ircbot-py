@@ -494,11 +494,13 @@ class Player:
             self.room_host_list.remove(name)
 
     def remain_hosts_to_player(self, name):
-        if name in self.room_host_list:
-            index = self.room_host_list.index(name)
-            return index
-        else:
-            print(name, "is not in room_host_list", self.room_host_list)
+        name_normalized = name.replace(" ", "_")
+        for index, host in enumerate(self.room_host_list):
+            host_normalized = host.replace(" ", "_")
+            if name_normalized == host_normalized:
+                return index
+        print(f"{name} is not in room_host_list", self.room_host_list)
+        return -1  # 如果没有找到匹配的名字，返回-1
 
     def extract_player_name(self, text):
         match = re.search(r'https://osu\.ppy\.sh/u/\d+\s*(.*?)(?:\s*\[.*\])?$', text)
@@ -520,7 +522,7 @@ class Player:
                 for i in self.room_host_list_apprence[0:1]:
                     self.room_host_list_apprence_final += i
                     self.room_host_list_apprence_final += "-->"
-                self.room_host_list_apprence_final += list_len - 3
+                self.room_host_list_apprence_final += str(list_len - 3)
                 self.room_host_list_apprence_final += " players -->"
                 self.room_host_list_apprence_final += self.room_host_list_apprence[-1]
             else:
