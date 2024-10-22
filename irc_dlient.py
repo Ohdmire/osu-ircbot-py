@@ -325,7 +325,7 @@ class MyIRCClient:
                     # 发送队列
                     p.convert_host()
                     r.send_msg(connection, event, str(
-                        f'当前队列：{p.room_host_list_apprence_final}'))
+                        f'当前队列：{p.room_host_list_apprence_text}'))
                     # 重置游戏开始时间
                     r.reset_game_start_time()
 
@@ -347,7 +347,7 @@ class MyIRCClient:
                     # 发送队列
                     p.convert_host()
                     r.send_msg(connection, event, str(
-                        f'当前队列：{p.room_host_list_apprence_final}'))
+                        f'当前队列：{p.room_host_list_apprence_text}'))
                     # 重置游戏开始时间
                     r.reset_game_start_time()
                 # bancho重启
@@ -473,8 +473,7 @@ class Player:
     def __init__(self):
         self.player_list = []
         self.room_host_list = []
-        self.room_host_list_apprence = []
-        self.room_host_list_apprence_final = ""
+        self.room_host_list_apprence_text = ""
         self.approved_abort_list = []
         self.approved_start_list = []
         self.approved_host_rotate_list = []
@@ -511,28 +510,18 @@ class Player:
 
     def convert_host(self):
         try:
-            self.room_host_list_apprence.clear()
-            for i in self.room_host_list:
-                url_i = i.replace(" ", "%20")
-                new_name = f'[https://osu.ppy.sh/users/{url_i} {i}]'
-                self.room_host_list_apprence.append(new_name)
-            self.room_host_list_apprence_final = ""
-            list_len = len(self.room_host_list)
-            if list_len > 3:  # >3的情况 就是 player1 --> player2 --> x_otherplayers --> lastplayer
-                for i in self.room_host_list_apprence[0:1]:
-                    self.room_host_list_apprence_final += i
-                    self.room_host_list_apprence_final += "-->"
-                self.room_host_list_apprence_final += str(list_len - 3)
-                self.room_host_list_apprence_final += " players -->"
-                self.room_host_list_apprence_final += self.room_host_list_apprence[-1]
-            else:
-                for i in self.room_host_list_apprence:
-                    self.room_host_list_apprence_final += i
-                    self.room_host_list_apprence_final += "-->"
-                self.room_host_list_apprence_final = self.room_host_list_apprence_final[:-3]
-
+            self.room_host_list_apprence_text = ""
+            for index, host in enumerate(self.room_host_list):
+                if index == 0:
+                    self.room_host_list_apprence_text += host
+                else:
+                    # 在每个字符之间插入零宽空格
+                    self.room_host_list_apprence_text += "\u200B".join(host)
+                
+                if index < len(self.room_host_list) - 1:
+                    self.room_host_list_apprence_text += "-->"
         except:
-            print("房主队列为空")
+            print("房主队列转换失败")
 
     def remove_player(self, name):
         if name in self.player_list:
