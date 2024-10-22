@@ -144,7 +144,10 @@ class MyIRCClient:
             r.join_room(connection, event)
             r.change_password(connection, event)
             r.get_mp_settings(connection, event)
-        
+            try:
+                self.start_periodic_task()
+            except:
+                print("定时任务启动失败")
         # 如果房间不存在
         else:
             r.create_room(connection, event)
@@ -655,15 +658,6 @@ class Room:
     def send_msg(self, connection, evetn, msg_text):
         connection.privmsg(self.room_id, msg_text)
         print("发送消息："+msg_text)
-
-    def close_last_room(self, connection, event):
-        if self.last_romm_id != self.room_id:
-            connection.join(self.last_romm_id)
-            connection.privmsg(self.last_romm_id, "!mp close")
-            connection.part(self.last_romm_id)
-            print("关闭上一个房间")
-        else:
-            print("不需要关闭上一个房间")
 
     def create_room(self, connection, event):
         connection.privmsg(
