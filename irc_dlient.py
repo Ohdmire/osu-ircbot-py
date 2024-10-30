@@ -39,7 +39,6 @@ class Config:
 
 
 class MyIRCClient:
-
     def __init__(self, server, port, nickname, password):
         self.irc_react = irc.client.Reactor()
         self.server = self.irc_react.server()
@@ -705,7 +704,7 @@ class Room:
 
 
 class Beatmap:
-    def __init__(self):
+    def __init__(self, client_id, client_secret):
         self.osu_client_id = client_id
         self.osu_client_secret = client_secret
         self.osu_token = ""
@@ -783,7 +782,7 @@ class Beatmap:
             )['beatmapset']['artist_unicode']
             self.beatmap_star = response.json()['difficulty_rating']
             self.beatmap_status = response.json()['status']
-            self.beatemap_bpm = response.json()['bpm']
+            self.beatmap_bpm = response.json()['bpm']
             self.beatmap_cs = response.json()['cs']
             self.beatmap_ar = response.json()['ar']
             self.beatmap_od = response.json()['accuracy']
@@ -805,7 +804,7 @@ class Beatmap:
             self.beatmap_artist = ""
             self.beatmap_star = 0
             self.beatmap_status = ""
-            self.beatemap_bpm = ""
+            self.beatmap_bpm = ""
             self.beatmap_cs = ""
             self.beatmap_ar = ""
             self.beatmap_od = ""
@@ -1215,25 +1214,24 @@ class PP:
 
         return f'now:{self.currpp}pp| if FC({self.maxbeatmapcombo}x):{self.fcpp}pp| 95%:{self.fc95pp}pp| 96%:{self.fc96pp}pp| 97%:{self.fc97pp}pp| 98%:{self.fc98pp}pp| 99%:{self.fc99pp}pp| SS:{self.maxpp}pp| aim:{self.curraimpp}/{self.maxaimpp}pp| speed:{self.currspeedpp}/{self.maxspeedpp}pp| acc:{self.curraccpp}/{self.maxaccpp}pp'
 
-# 没有maps文件夹时自动创建maps文件夹
-maps_dir = os.path.join(os.getcwd(), './maps')
-if not os.path.exists(maps_dir):
-    os.makedirs(maps_dir)
-    print(f"'{maps_dir}'文件夹不存在，已经自动创建")
+if __name__ == '__main__':
+    config = Config()
+    # 没有maps文件夹时自动创建maps文件夹
+    maps_dir = os.path.join(os.getcwd(), './maps')
+    if not os.path.exists(maps_dir):
+        os.makedirs(maps_dir)
+        print(f"'{maps_dir}'文件夹不存在，已经自动创建")
 
-config = Config()
+    client_id = config.osuclientid
+    client_secret = config.osuclientsecret
 
-client_id = config.osuclientid
-client_secret = config.osuclientsecret
+    osu_nickname = config.osunickname
+    osu_password = config.osupassword
 
-osu_nickname = config.osunickname
-osu_password = config.osupassword
+    p = Player()
+    r = Room()
+    b = Beatmap(client_id, client_secret)
+    pp = PP()
 
-
-p = Player()
-r = Room()
-b = Beatmap()
-pp = PP()
-
-client = MyIRCClient(osu_server, osu_port, osu_nickname, osu_password)
-client.start()
+    client = MyIRCClient(osu_server, osu_port, osu_nickname, osu_password)
+    client.start()
