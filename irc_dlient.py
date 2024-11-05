@@ -631,7 +631,7 @@ class Room:
 
     def get_last_room_id(self):
         try:
-            with open(self.config.last_room_id_path, 'r') as f:
+            with open('last_room_id.txt', 'r') as f:
                 self.last_romm_id = f.read()
                 print(f'获取上一个房间ID{self.last_romm_id}')
         except:
