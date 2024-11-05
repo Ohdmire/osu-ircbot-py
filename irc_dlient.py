@@ -19,8 +19,6 @@ import time
 osu_server = "irc.ppy.sh"
 osu_port = 6667
 
-# 定义IRC客户端类
-
 
 class Config:
     def __init__(self):
@@ -37,13 +35,13 @@ class Config:
         self.timelimit = self.config['OSU']['timelimit']
         self.mppassword = self.config['OSU']['mppassword']
 
-
+# 定义IRC客户端类
 class MyIRCClient:
-
-    def __init__(self, server, port, nickname, password):
+    def __init__(self, server, port, config):
         self.irc_react = irc.client.Reactor()
+        self.config = config
         self.server = self.irc_react.server()
-        self.server.connect(server, port, nickname, password)
+        self.server.connect(server, port, config.osunickname, config.osupassword)
         self.irc_react.add_global_handler("welcome", self.on_connect)
         self.irc_react.add_global_handler("pubmsg", self.on_pubmsg)
         self.irc_react.add_global_handler("privmsg", self.on_privmsg)
@@ -279,13 +277,13 @@ class MyIRCClient:
 
                     if b.check_beatmap_if_out_of_star():
                         r.send_msg(connection, event,
-                                   f'{b.beatmap_star}*>{config.starlimit}* 请重新选择')
+                                   f'{b.beatmap_star}*>{self.config.starlimit}* 请重新选择')
                         r.change_beatmap_to(connection, event, last_beatmap_id)
                         b.change_beatmap_id(last_beatmap_id)
                         return
                     if b.check_beatmap_if_out_of_time():
                         r.send_msg(connection, event,
-                                   f'{b.beatmap_length}s>{config.timelimit}s 请重新选择')
+                                   f'{b.beatmap_length}s>{self.config.timelimit}s 请重新选择')
                         r.change_beatmap_to(connection, event, last_beatmap_id)
                         b.change_beatmap_id(last_beatmap_id)
                         return
@@ -618,10 +616,11 @@ class Player:
 
 # 定义房间操作类
 class Room:
-    def __init__(self):
+    def __init__(self, config):
         self.room_id = ""
         self.last_romm_id = ""
         self.game_start_time = ""
+        self.config = config
 
     def set_game_start_time(self):
         self.game_start_time = datetime.now()
@@ -661,7 +660,7 @@ class Room:
 
     def create_room(self, connection, event):
         connection.privmsg(
-            "BanchoBot", "!mp make "+config.mpname)
+            "BanchoBot", "!mp make "+self.config.mpname)
         print("创建房间")
 
     def join_room(self, connection, event):
@@ -685,7 +684,7 @@ class Room:
         print("丢弃游戏")
 
     def change_password(self, connection, event):
-        connection.privmsg(self.room_id, "!mp password "+config.mppassword)
+        connection.privmsg(self.room_id, "!mp password "+self.config.mppassword)
         print("修改密码")
 
     def change_beatmap_to(self, connection, event, beatmapid):
@@ -702,12 +701,11 @@ class Room:
 
 
 # 定义谱面类
-
-
 class Beatmap:
-    def __init__(self):
-        self.osu_client_id = client_id
-        self.osu_client_secret = client_secret
+    def __init__(self, config):
+        self.osu_client_id = config.osuclientid
+        self.osu_client_secret = config.osuclientsecret
+        self.config = config
         self.osu_token = ""
         self.beatmap_id = ""
         self.beatmap_songs_id = ""
@@ -779,11 +777,10 @@ class Beatmap:
             self.beatmap_songs_id = str(response.json()['beatmapset_id'])
 
             self.beatmap_name = response.json()['beatmapset']['title_unicode']
-            self.beatmap_artist = response.json(
-            )['beatmapset']['artist_unicode']
+            self.beatmap_artist = response.json()['beatmapset']['artist_unicode']
             self.beatmap_star = response.json()['difficulty_rating']
             self.beatmap_status = response.json()['status']
-            self.beatemap_bpm = response.json()['bpm']
+            self.beatmap_bpm = response.json()['bpm']
             self.beatmap_cs = response.json()['cs']
             self.beatmap_ar = response.json()['ar']
             self.beatmap_od = response.json()['accuracy']
@@ -805,7 +802,7 @@ class Beatmap:
             self.beatmap_artist = ""
             self.beatmap_star = 0
             self.beatmap_status = ""
-            self.beatemap_bpm = ""
+            self.beatmap_bpm = ""
             self.beatmap_cs = ""
             self.beatmap_ar = ""
             self.beatmap_od = ""
@@ -821,17 +818,17 @@ class Beatmap:
         print(f'更换谱面ID为 {self.beatmap_id}')
 
     def check_beatmap_if_out_of_star(self):
-        if float(config.starlimit) == 0:
+        if float(self.config.starlimit) == 0:
             return False
-        if self.beatmap_star > float(config.starlimit):
+        if self.beatmap_star > float(self.config.starlimit):
             return True
         else:
             return False
 
     def check_beatmap_if_out_of_time(self):
-        if float(config.timelimit) == 0:
+        if float(self.config.timelimit) == 0:
             return False
-        if self.beatmap_length > float(config.timelimit):
+        if self.beatmap_length > float(self.config.timelimit):
             return True
         else:
             return False
@@ -1215,25 +1212,20 @@ class PP:
 
         return f'now:{self.currpp}pp| if FC({self.maxbeatmapcombo}x):{self.fcpp}pp| 95%:{self.fc95pp}pp| 96%:{self.fc96pp}pp| 97%:{self.fc97pp}pp| 98%:{self.fc98pp}pp| 99%:{self.fc99pp}pp| SS:{self.maxpp}pp| aim:{self.curraimpp}/{self.maxaimpp}pp| speed:{self.currspeedpp}/{self.maxspeedpp}pp| acc:{self.curraccpp}/{self.maxaccpp}pp'
 
-# 没有maps文件夹时自动创建maps文件夹
-maps_dir = os.path.join(os.getcwd(), './maps')
-if not os.path.exists(maps_dir):
-    os.makedirs(maps_dir)
-    print(f"'{maps_dir}'文件夹不存在，已经自动创建")
 
-config = Config()
+if __name__ == '__main__':
+    # 没有maps文件夹时自动创建maps文件夹
+    maps_dir = os.path.join(os.getcwd(), './maps')
+    if not os.path.exists(maps_dir):
+        os.makedirs(maps_dir)
+        print(f"'{maps_dir}'文件夹不存在，已经自动创建")
 
-client_id = config.osuclientid
-client_secret = config.osuclientsecret
+    config = Config()
 
-osu_nickname = config.osunickname
-osu_password = config.osupassword
+    p = Player()
+    r = Room(config)
+    b = Beatmap(config)
+    pp = PP()
 
-
-p = Player()
-r = Room()
-b = Beatmap()
-pp = PP()
-
-client = MyIRCClient(osu_server, osu_port, osu_nickname, osu_password)
-client.start()
+    client = MyIRCClient(osu_server, osu_port, config)
+    client.start()
