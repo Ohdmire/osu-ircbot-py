@@ -1,6 +1,8 @@
 # osu-ircbot-py
 基于python使用irc自动轮换房主的osu机器人
 
+[![codecov](https://codecov.io/gh/SuperEgoKoishi/osu-ircbot-py/graph/badge.svg?token=Z4HLQQIACJ)](https://codecov.io/gh/SuperEgoKoishi/osu-ircbot-py)
+
 # 文档
 输入help获取吧 咕咕咕
 
@@ -9,10 +11,14 @@
 ```python
 pip install -r requirements.txt
 ```
-
 运行程序
 ```bash
 python3 irc_dlient.py
+```
+执行单元测试
+```bash
+pip install coverage
+coverage run -m unittest discover -s tests
 ```
 
 
