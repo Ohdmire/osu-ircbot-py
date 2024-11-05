@@ -1,7 +1,7 @@
 # osu-ircbot-py
 基于python使用irc自动轮换房主的osu机器人
 
-[![codecov](https://codecov.io/gh/SuperEgoKoishi/osu-ircbot-py/graph/badge.svg?token=Z4HLQQIACJ)](https://codecov.io/gh/SuperEgoKoishi/osu-ircbot-py)
+[![codecov](https://codecov.io/github/Ohdmire/osu-ircbot-py/graph/badge.svg?token=HZZ0PPME7L)](https://codecov.io/github/Ohdmire/osu-ircbot-py)
 
 # 文档
 输入help获取吧 咕咕咕
