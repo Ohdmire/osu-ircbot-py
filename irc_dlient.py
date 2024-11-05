@@ -19,8 +19,6 @@ import time
 osu_server = "irc.ppy.sh"
 osu_port = 6667
 
-# 定义IRC客户端类
-
 
 class Config:
     def __init__(self):
@@ -37,7 +35,7 @@ class Config:
         self.timelimit = self.config['OSU']['timelimit']
         self.mppassword = self.config['OSU']['mppassword']
 
-
+# 定义IRC客户端类
 class MyIRCClient:
     def __init__(self, server, port, nickname, password):
         self.irc_react = irc.client.Reactor()
@@ -701,8 +699,6 @@ class Room:
 
 
 # 定义谱面类
-
-
 class Beatmap:
     def __init__(self, client_id, client_secret):
         self.osu_client_id = client_id
@@ -778,8 +774,7 @@ class Beatmap:
             self.beatmap_songs_id = str(response.json()['beatmapset_id'])
 
             self.beatmap_name = response.json()['beatmapset']['title_unicode']
-            self.beatmap_artist = response.json(
-            )['beatmapset']['artist_unicode']
+            self.beatmap_artist = response.json()['beatmapset']['artist_unicode']
             self.beatmap_star = response.json()['difficulty_rating']
             self.beatmap_status = response.json()['status']
             self.beatmap_bpm = response.json()['bpm']
@@ -1214,8 +1209,9 @@ class PP:
 
         return f'now:{self.currpp}pp| if FC({self.maxbeatmapcombo}x):{self.fcpp}pp| 95%:{self.fc95pp}pp| 96%:{self.fc96pp}pp| 97%:{self.fc97pp}pp| 98%:{self.fc98pp}pp| 99%:{self.fc99pp}pp| SS:{self.maxpp}pp| aim:{self.curraimpp}/{self.maxaimpp}pp| speed:{self.currspeedpp}/{self.maxspeedpp}pp| acc:{self.curraccpp}/{self.maxaccpp}pp'
 
+config = Config()
+
 if __name__ == '__main__':
-    config = Config()
     # 没有maps文件夹时自动创建maps文件夹
     maps_dir = os.path.join(os.getcwd(), './maps')
     if not os.path.exists(maps_dir):

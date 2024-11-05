@@ -9,13 +9,14 @@
 ```python
 pip install -r requirements.txt
 ```
-执行单元测试
-```bash
-python3 -m unittest -v test_irc_client.py
-```
 运行程序
 ```bash
 python3 irc_dlient.py
+```
+执行单元测试
+```bash
+pip install coverage
+coverage run -m unittest discover -s tests
 ```
 
 
