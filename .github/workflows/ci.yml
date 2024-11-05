@@ -35,6 +35,7 @@ jobs:
       uses: codecov/codecov-action@v3
       with:
         files: coverage.xml
+        token: 4a07675d-ac1b-481f-b392-b2096882f061
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: true
