@@ -1,4 +1,5 @@
 import unittest
+import requests
 from unittest.mock import patch, MagicMock
 from io import StringIO
 import irc_dlient
@@ -58,13 +59,17 @@ class TestPlayer(unittest.TestCase):
 
 class TestBeatmap(unittest.TestCase):
     def setUp(self):
-        # 从 config.ini 中读取 client_id 和 client_secret
-        config = irc_dlient.Config()
-        self.client_id = config.osuclientid
-        self.client_secret = config.osuclientsecret
+        # 构造模拟config
+        self.mock_config = MagicMock()
+        self.mock_config.osuclientid = 'test_client_id'
+        self.mock_config.osuclientsecret = 'test_client_secret'
+        self.mock_config.timelimit = '100'  # Example value
+        self.mock_config.starlimit = '5.0'
+        self.mock_config.mpname = 'TestMP'
+        self.mock_config.mppassword = 'testpassword'
 
-        # 实例化 Beatmap 对象并设置 client_id 和 client_secret
-        self.beatmap = irc_dlient.Beatmap(self.client_id, self.client_secret)
+        # 实例化Beatmap
+        self.beatmap = irc_dlient.Beatmap(self.mock_config)
 
     @patch('irc_dlient.requests.post')
     def test_get_token_success(self, mock_post):
@@ -80,12 +85,21 @@ class TestBeatmap(unittest.TestCase):
 
         self.assertEqual(self.beatmap.osu_token, 'test_token')
 
-    @patch('irc_dlient.config')
-    def test_check_beatmap_if_out_of_time(self, mock_config):
+    def test_clear_cache(self):
+        """
+        清除缓存
+        """
+        self.beatmap.osu_token = "test_token"
+        self.beatmap.id2name = {"test_user": "test_id"}
+        self.beatmap.clear_cache()
+        self.assertEqual(self.beatmap.osu_token, "")
+        self.assertEqual(self.beatmap.id2name, {})
+
+    def test_check_beatmap_if_out_of_time(self):
         """
         检查谱面时间限制
         """
-        mock_config.timelimit = 0
+        self.mock_config.timelimit = 0
         self.beatmap.beatmap_length = 100
         self.beatmap.check_beatmap_if_out_of_time()
         self.assertEqual(self.beatmap.check_beatmap_if_out_of_time(), False)
@@ -94,7 +108,7 @@ class TestBeatmap(unittest.TestCase):
         self.beatmap.check_beatmap_if_out_of_time()
         self.assertEqual(self.beatmap.check_beatmap_if_out_of_time(), False)
 
-        mock_config.timelimit = 100
+        self.mock_config.timelimit = 100
         self.beatmap.beatmap_length = 100
         self.beatmap.check_beatmap_if_out_of_time()
         self.assertEqual(self.beatmap.check_beatmap_if_out_of_time(), False)
@@ -103,13 +117,32 @@ class TestBeatmap(unittest.TestCase):
         self.beatmap.check_beatmap_if_out_of_time()
         self.assertEqual(self.beatmap.check_beatmap_if_out_of_time(), True)
 
-    def test_get_beatmap_info_success(self):
+    @patch('irc_dlient.requests.get')
+    def test_get_beatmap_info_success(self, mock_get):
         """
         发送正确的beatmap id到 osu! API
         """
-        # 获取 Token
-        self.beatmap.get_token()
-        self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
+        # 构造mock数据
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            'beatmapset_id': '1',
+            'beatmapset': {
+                'title_unicode': 'DISCO PRINCE',
+                'artist_unicode': 'Kenji Ninuma',
+                'ranked_date': '2007-10-06'
+            },
+            'difficulty_rating': 2.55,
+            'status': 'ranked',
+            'bpm': 120,
+            'cs': 4,
+            'ar': 6,
+            'accuracy': 6,
+            'drain': 6,
+            'total_length': 142,
+            'url': 'https://osu.ppy.sh/beatmaps/75'
+        }
+        mock_get.return_value = mock_response
 
         # 设置 beatmap_id
         self.beatmap.change_beatmap_id('75')  # osu第一个ranked图
@@ -134,10 +167,16 @@ class TestBeatmap(unittest.TestCase):
         self.assertEqual(self.beatmap.beatmap_mirror_sayo_url, 'https://osu.sayobot.cn/home?search=1')
         self.assertEqual(self.beatmap.beatmap_mirror_inso_url, 'http://inso.link/yukiho/?b=75')
 
-    def test_get_beatmap_info_with_wrong_beatmap_id(self):
+    @patch('irc_dlient.requests.get')
+    def test_get_beatmap_info_with_wrong_beatmap_id(self, mock_get):
         """
         发送错误的beatmap id到 osu! API
         """
+        # 构造mock数据
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+        mock_get.return_value = mock_response
+
         # 获取 Token
         self.beatmap.get_token()
         self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
@@ -165,17 +204,38 @@ class TestBeatmap(unittest.TestCase):
         self.assertEqual(self.beatmap.beatmap_mirror_sayo_url, '')
         self.assertEqual(self.beatmap.beatmap_mirror_inso_url, '')
 
-    def test_get_beatmap_score_success(self):
+    @patch('irc_dlient.requests.get')
+    def test_get_beatmap_score_success(self, mock_get):
         """
         发送正确的username查询分数
         """
-        # 获取 Token
-        self.beatmap.get_token()
-        self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
-
-        # 设置 username
+        # 设置username
+        self.beatmap.id2name = {"LittleStone": "123456"}
         self.beatmap.get_user_id("LittleStone")
         self.assertIsNotNone(self.beatmap.id2name, "用户ID获取失败")
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            'score': {
+                'created_at': '2020-12-04T00:00:00+00:00',
+                'accuracy': 0.8385,
+                'max_combo': 122,
+                'statistics': {
+                    'count_300': 150,
+                    'count_100': 35,
+                    'count_50': 6,
+                    'count_miss': 3
+                },
+                'pp': 28.0404,
+                'rank': 'C',
+                'mods': ['HD', 'HR', 'DT'],
+                'beatmap': {
+                    'url': 'https://osu.ppy.sh/beatmaps/75'
+                }
+            }
+        }
+        mock_get.return_value = mock_response
 
         # 设置 beatmap_id
         self.beatmap.beatmap_id = '75'  # osu第一个ranked图
@@ -200,73 +260,88 @@ class TestBeatmap(unittest.TestCase):
         self.assertEqual(self.beatmap.pr_username, 'LittleStone')
         self.assertEqual(self.beatmap.pr_acc, 83.85)
     
-    def test_get_beatmap_score_with_wrong_username_1(self):
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_get_beatmap_score_with_wrong_username_1(self, fake_out):
         """
         发送错误的username查询分数-场景1
         """
-        # 获取 Token
-        self.beatmap.get_token()
-        self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
+        self.beatmap.id2name = {}
+        self.beatmap.get_beatmap_score("PPYNOTPPYGUESSIMPPYORNOT")
+        self.assertIn("获取谱面成绩失败", fake_out.getvalue(), "Output does not contain expected failure message.")
 
-        # 设置错误的 username，并捕获输出
-        with patch('sys.stdout', new=StringIO()) as fake_out:
-            self.beatmap.get_user_id("PPYNOTPPYGUESSIMPPYORNOT")
-            self.assertIn("获取用户ID失败", fake_out.getvalue(),  "输出不包含预期的字符串")
-
-    def test_get_beatmap_score_with_wrong_username_2(self):
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_get_beatmap_score_with_wrong_username_2(self, fake_out):
         """
         发送错误的username查询分数-场景2
         """
-        # 获取 Token
-        self.beatmap.get_token()
-        self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
+        # 构造mock数据
+        mock_post = MagicMock()
+        mock_post.raise_for_status = MagicMock()
+        mock_post.json.return_value = {'access_token': 'test_token'}
+        with patch('irc_dlient.requests.post', return_value=mock_post):
+            self.beatmap.get_token()
+            self.assertEqual(self.beatmap.osu_token, 'test_token')
 
         # 设置 username
-        self.beatmap.get_user_id("LittleStone")
-        self.assertIsNotNone(self.beatmap.id2name, "用户ID获取失败")
+        self.beatmap.id2name = {"LittleStone": "123456"}
 
         # 设置 beatmap_id
         self.beatmap.beatmap_id = '75'  # osu第一个ranked图
 
         # 设置错误的 username，并捕获输出
-        with patch('sys.stdout', new=StringIO()) as fake_out:
-            self.beatmap.get_beatmap_score("ATRI1024")
-            self.assertIn("获取谱面成绩失败，错误信息：'ATRI1024'\n| [ 获取谱面成绩失败 - ]| *|  [  ] 0pp acc:0% combo:0x| 0/0/0/0| date:|",
-                            fake_out.getvalue(),  "输出不包含预期的字符串")
+        self.beatmap.get_beatmap_score("ATRI1024")
+        self.assertIn(
+            "获取谱面成绩失败，错误信息：'ATRI1024'\n| [ 获取谱面成绩失败 - ]| *|  [  ] 0pp acc:0% combo:0x| 0/0/0/0| date:|\n",
+            fake_out.getvalue(),
+            "Output does not contain expected failure message."
+        )
 
-    def test_get_beatmap_score_with_wrong_beatmap_id(self):
+    @patch('irc_dlient.requests.get')
+    @patch('irc_dlient.requests.post')
+    def test_get_beatmap_score_with_wrong_beatmap_id(self, mock_post, mock_get):
         """
         发送错误的beatmap id查询分数
         """
+        # 构造mock数据
+        mock_post_response = MagicMock()
+        mock_post_response.raise_for_status = MagicMock()
+        mock_post_response.json.return_value = {'access_token': 'test_token'}
+        mock_post.return_value = mock_post_response
+
         # 获取 Token
         self.beatmap.get_token()
-        self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
+        self.assertEqual(self.beatmap.osu_token, 'test_token')
 
         # 设置 username
-        self.beatmap.get_user_id("LittleStone")
-        self.assertIsNotNone(self.beatmap.id2name, "用户ID获取失败")
+        self.beatmap.id2name = {"LittleStone": "123456"}
 
         # 设置 beatmap_id
         self.beatmap.beatmap_id = '1145141919810'  # 不存在的图
 
-        # 设置错误的 username，并捕获输出
-        with patch('sys.stdout', new=StringIO()) as fake_out:
+        # 调用获取谱面成绩的方法
+        mock_get_response = MagicMock()
+        mock_get_response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+        mock_get.return_value = mock_get_response
+
+        with patch('sys.stdout', new_callable=StringIO) as fake_out:
             self.beatmap.get_beatmap_score("LittleStone")
-            self.assertIn("未查询到LittleStone在该谱面上留下的成绩\n", fake_out.getvalue(),  "输出不包含预期的字符串")
+            self.assertIn(
+                "未查询到LittleStone在该谱面上留下的成绩\n",
+                fake_out.getvalue(),
+                "Output does not contain expected failure message."
+            )
 
     @patch('irc_dlient.requests.get')
     def test_get_recent_info_success(self, mock_get):
         """
         发送正确的username查询最近成绩，并模拟返回数据
         """
-        # 获取 Token
-        self.beatmap.get_token()
-        self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
-
-         # 设置 username
-        self.beatmap.get_user_id("LittleStone")
+        # 设置username
         self.beatmap.id2name = {"LittleStone": "123456"}
+        self.beatmap.get_user_id("LittleStone")
+        self.assertIsNotNone(self.beatmap.id2name, "用户ID获取失败")
 
+        # 构造返回数据
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = [
@@ -313,23 +388,32 @@ class TestBeatmap(unittest.TestCase):
         self.assertEqual(self.beatmap.pr_beatmap_url, 'https://osu.ppy.sh/beatmapsets/123456#osu/654321')
         self.assertEqual(self.beatmap.pr_username, 'LittleStone')
 
-    def test_get_recent_info_with_wrong_username(self):
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_get_recent_info_with_wrong_username(self, fake_out):
         """
         发送错误的username查询最近成绩
         """
-        # 获取 Token
-        self.beatmap.get_token()
-        self.assertIsNotNone(self.beatmap.osu_token, "Token 获取失败")
+        # 构造mock数据
+        mock_post = MagicMock()
+        mock_post.raise_for_status = MagicMock()
+        mock_post.json.return_value = {'access_token': 'test_token'}
+        with patch('irc_dlient.requests.post', return_value=mock_post):
+            self.beatmap.get_token()
+            self.assertEqual(self.beatmap.osu_token, 'test_token')
 
-         # 设置 username
-        self.beatmap.get_user_id("LittleStone")
+        # 设置 username
         self.beatmap.id2name = {"LittleStone": "123456"}
 
+        # 设置beatmap id
+        self.beatmap.beatmap_id = '75'
+
         # 调用获取最近成绩的方法
-        with patch('sys.stdout', new=StringIO()) as fake_out:
-            self.beatmap.get_recent_info("ATRI1024")
-            self.assertIn("获取最近成绩失败，错误信息：'ATRI1024'\n| [ 获取最近成绩失败 - ]| *|  [  ] 0pp acc:0% combo:0x| 0/0/0/0|\n",
-                            fake_out.getvalue(),  "输出不包含预期的字符串")
+        self.beatmap.get_recent_info("ATRI1024")
+        self.assertIn(
+            "获取最近成绩失败，错误信息：'ATRI1024'\n| [ 获取最近成绩失败 - ]| *|  [  ] 0pp acc:0% combo:0x| 0/0/0/0|\n",
+            fake_out.getvalue(),
+            "Output does not contain expected failure message."
+        )
 
 class TestPP(unittest.TestCase):
     @patch('irc_dlient.os.path.exists')
@@ -356,21 +440,32 @@ class TestPP(unittest.TestCase):
         # 可以进一步检查文件写入，但需要更多的patching
 
 class TestRoom(unittest.TestCase):
+    def setUp(self):
+        # 构造模拟config
+        self.mock_config = MagicMock()
+        self.mock_config.osuclientid = 'test_client_id'
+        self.mock_config.osuclientsecret = 'test_client_secret'
+        self.mock_config.timelimit = '100'  # Example value
+        self.mock_config.starlimit = '5.0'
+        self.mock_config.mpname = 'TestMP'
+        self.mock_config.mppassword = 'testpassword'
+
+        # 实例化Room
+        self.room = irc_dlient.Room(self.mock_config)
+
     @patch('builtins.open')
     def test_save_last_room_id(self, mock_open):
         mock_file = MagicMock()
         mock_open.return_value.__enter__.return_value = mock_file
 
-        room = irc_dlient.Room()
-        room.room_id = '#room123'
-        room.save_last_room_id()
+        self.room.room_id = '#room123'
+        self.room.save_last_room_id()
 
         mock_file.write.assert_called_with('#room123')
 
     @patch('builtins.open', side_effect=FileNotFoundError)
     def test_get_last_room_id_file_not_found(self, mock_open):
-        room = irc_dlient.Room()
-        last_id = room.get_last_room_id()
+        last_id = self.room.get_last_room_id()
         self.assertEqual(last_id, '')
 
 if __name__ == '__main__':
