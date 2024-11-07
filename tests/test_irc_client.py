@@ -4,6 +4,7 @@ import time
 from unittest.mock import patch, MagicMock
 from io import StringIO
 import irc_dlient
+import rosu_pp_py as rosu
 
 class TestMyIRCClient(unittest.TestCase):
     def setUp(self):
@@ -134,7 +135,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!start"]
         # 一个叫BanchoBot114的用户发送了!start命令
-        mock_event.source = "收到频道消息  BanchoBot114:!start"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -153,7 +154,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!abort"]
         # 一个叫BanchoBot114的用户发送了!abort命令
-        mock_event.source = "收到频道消息  BanchoBot114:!abort"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -172,7 +173,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!skip"]
         # 一个叫BanchoBot114的用户发送了!skip命令
-        mock_event.source = "收到频道消息  BanchoBot114:!skip"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -191,7 +192,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!close"]
         # 一个叫BanchoBot114的用户发送了!close命令
-        mock_event.source = "收到频道消息  BanchoBot114:!close"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -210,7 +211,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!queue"]
         # 一个叫BanchoBot114的用户发送了!queue命令
-        mock_event.source = "收到频道消息  BanchoBot114:!queue"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
         self.client.p.remain_hosts_to_player = MagicMock(return_value=1)
 
         # 调用on_pubmsg
@@ -219,7 +220,7 @@ class TestMyIRCClient(unittest.TestCase):
         # 断言转换房主的方法被调用
         self.client.p.convert_host.assert_called()
         # 断言剩余人数获取方法被调用
-        self.client.p.remain_hosts_to_player.assert_called_with("收到频道消息  BanchoBot114:")
+        self.client.p.remain_hosts_to_player.assert_called_with("BanchoBot114")
         # 断言发送消息的方法被调用
         self.client.r.send_msg.assert_called_with(mock_connection, mock_event, "你前面剩余人数：1")
 
@@ -234,7 +235,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["help"]
         # 一个叫BanchoBot114的用户发送了help命令
-        mock_event.source = "收到频道消息  BanchoBot114:help"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -253,7 +254,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!pr"]
         # 一个叫BanchoBot114的用户发送了!pr命令
-        mock_event.source = "收到频道消息  BanchoBot114:!pr"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -285,7 +286,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!ping"]
         # 一个叫BanchoBot114的用户发送了!ping命令
-        mock_event.source = "收到频道消息  BanchoBot114:!ping"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -304,7 +305,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!m+HardRock"]
         # 一个叫BanchoBot114的用户发送了!m+HardRock命令
-        mock_event.source = "收到频道消息  BanchoBot114:!m+HardRock"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -327,7 +328,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["!about"]
         # 一个叫BanchoBot114的用户发送了!about命令
-        mock_event.source = "收到频道消息  BanchoBot114:!about"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -350,7 +351,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["！start"]  # 全角感叹号
         # 一个叫BanchoBot114的用户发送了！start命令
-        mock_event.source = "收到频道消息  BanchoBot114:！start"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -369,7 +370,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_event = MagicMock()
         mock_event.arguments = ["！i"]  # 全角感叹号
         # 一个叫BanchoBot114的用户发送了！i命令
-        mock_event.source = "收到频道消息  BanchoBot114:！i"
+        mock_event.source = "BanchoBot114!user@ppy.sh"
         self.client.b.beatmap_mirror_sayo_url = "https://osu.sayobot.cn/home?search=1"
         self.client.b.beatmap_mirror_inso_url = "http://inso.link/yukiho/?b=1"
 
@@ -411,7 +412,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_connection = MagicMock()
         mock_event = MagicMock()
         mock_event.arguments = ["Some random message"]
-        mock_event.source = "收到消息  BanchoBot:Some random message"
+        mock_event.source = "BanchoBot!user@ppy.sh"
 
         # 调用on_privmsg
         self.client.on_privmsg(mock_connection, mock_event)
@@ -433,7 +434,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_connection = MagicMock()
         mock_event = MagicMock()
         mock_event.arguments = ["joined in slot"]
-        mock_event.source = "收到频道消息  BanchoBot:123 joined in slot"
+        mock_event.source = "BanchoBot!user@ppy.sh"
 
         # 设置send_msg方法抛出异常
         self.client.r.send_msg.side_effect = Exception("模拟异常")
@@ -489,15 +490,15 @@ class TestMyIRCClient(unittest.TestCase):
     #     self.assertTrue(self.client.timer)
 
     @patch('builtins.print')
-    def test_on_pubmsg_handle_bancho_bot_room_created(self, mock_print):
+    def test_on_pubmsg_handle_bot_joined_room(self, mock_print):
         """
-        测试处理来自BanchoBot的房间创建成功消息
+        测试处理ATRI加入房间后，BanchoBot发送的房间信息
         """
         # 模拟接收频道消息事件
         mock_connection = MagicMock()
         mock_event = MagicMock()
-        mock_event.arguments = ["Slot 1 Ready https://osu.ppy.sh/u/1234567890 BanchoBot114"]
-        mock_event.source = "收到频道消息  BanchoBot:Slot 1 Ready https://osu.ppy.sh/u/1234567890 BanchoBot114 Host"
+        mock_event.arguments = ["Slot 1 Ready https://osu.ppy.sh/u/1234567890 BanchoBot114     [Host]"]
+        mock_event.source = "BanchoBot!cho@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
@@ -505,6 +506,7 @@ class TestMyIRCClient(unittest.TestCase):
         # 断言
         self.assertEqual("BanchoBot114", self.client.p.room_host_list[0])
         self.assertEqual("BanchoBot114", self.client.p.player_list[0])
+        
 
     @patch('builtins.print')
     def test_on_pubmsg_handle_beatmap_changed_message(self, mock_print):
@@ -515,7 +517,7 @@ class TestMyIRCClient(unittest.TestCase):
         mock_connection = MagicMock()
         mock_event = MagicMock()
         mock_event.arguments = ["Beatmap changed to (https://osu.ppy.sh/b/1234567890)"]
-        mock_event.source = "收到频道消息  BanchoBot:Beatmap changed to (https://osu.ppy.sh/b/1234567890)"
+        mock_event.source = "BanchoBot!user@ppy.sh"
         self.client.b.beatmap_id = ""
 
         self.client.b.check_beatmap_if_out_of_star = MagicMock(return_value=True)
@@ -543,13 +545,31 @@ class TestMyIRCClient(unittest.TestCase):
         mock_connection = MagicMock()
         mock_event = MagicMock()
         mock_event.arguments = ["BanchoBot114 became the host"]
-        mock_event.source = "收到频道消息  BanchoBot:BanchoBot114 became the host"
+        mock_event.source = "BanchoBot!user@ppy.sh"
 
         # 调用on_pubmsg
         self.client.on_pubmsg(mock_connection, mock_event)
         
         # 断言
         self.assertEqual("BanchoBot114", self.client.p.room_host)
+
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_player_joined_room(self, mock_print):
+        """
+        测试处理玩家加入房间后，BanchoBot发送的房间信息
+        """
+        # 模拟接收频道消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["BanchoBot114 joined in slot"]
+        mock_event.source = "BanchoBot!user@ppy.sh"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言
+        self.assertEqual("BanchoBot114", self.client.p.room_host_list[0])
+        self.assertEqual("BanchoBot114", self.client.p.player_list[0])
 
 class TestConfig(unittest.TestCase):
     @patch('irc_dlient.configparser.ConfigParser')
@@ -963,6 +983,9 @@ class TestBeatmap(unittest.TestCase):
         )
 
 class TestPP(unittest.TestCase):
+    def setUp(self):
+        self.beatmap = irc_dlient.rosu.Beatmap(path='./tests/75.osu')
+
     @patch('irc_dlient.os.path.exists')
     @patch('irc_dlient.requests.get')
     def test_get_beatmap_file_exists(self, mock_get, mock_exists):
@@ -985,6 +1008,32 @@ class TestPP(unittest.TestCase):
 
         mock_get.assert_called_with('https://osu.ppy.sh/osu/12345')
         # 可以进一步检查文件写入，但需要更多的patching
+
+    @patch('irc_dlient.rosu.Beatmap')
+    def test_calculate_pp_fully_success(self,mock_beatmap):
+        mock_beatmap.return_value = self.beatmap
+
+        pp = irc_dlient.PP()
+        pp.calculate_pp_fully('HDHRDT')
+        self.assertEqual(pp.maxpp, 1100)
+        self.assertEqual(pp.maxbeatmapcombo, 3581)
+        self.assertEqual(pp.fc95pp, 656)
+        self.assertEqual(pp.fc96pp, 698)
+        self.assertEqual(pp.fc97pp, 751)
+        self.assertEqual(pp.fc98pp, 824)
+        self.assertEqual(pp.fc99pp, 931)
+        self.assertEqual(pp.stars, 7.79)
+        self.assertEqual(pp.afterar, 11.0)
+        self.assertEqual(pp.aftercs, 4.9)
+        self.assertEqual(pp.afterod, 11.1)
+        self.assertEqual(pp.afterhp, 7.0)
+
+    def test_calculate_pp_fully_failed(self):
+        pp = irc_dlient.PP()
+        pp.calculate_pp_fully('HDHRDT')
+        self.assertEqual(pp.maxpp, 0)
+        self.assertEqual(pp.maxbeatmapcombo, 0)
+        self.assertEqual(pp.fc95pp, 0)
 
 class TestRoom(unittest.TestCase):
     def setUp(self):

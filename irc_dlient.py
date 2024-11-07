@@ -107,18 +107,19 @@ class MyIRCClient:
     def check_last_room_status(self,last_room_id):
         if last_room_id == "":
             return False
-        self.b.get_token()
         try:
+            self.b.get_token()
             text = self.b.get_match_info(re.findall(r'\d+', last_room_id)[0])
+            # match-disbanded #比赛关闭
+            if "match-disbanded" in str(text['events']):
+                return False
+            else:
+                self.r.change_room_id(last_room_id)
+                return True
         except:
-            text = ""
-        # match-disbanded #比赛关闭
-        if "match-disbanded" in str(text['events']):
+            print("获取上一个房间失败")
             return False
-        else:
-            self.r.change_room_id(last_room_id)
-            return True
-
+        
     # 这是检查房间状态的流程 用于定时任务
     def check_room_status(self, room_id):
         self.b.get_token()
@@ -221,10 +222,11 @@ class MyIRCClient:
 
         try:
             # 打印接收到的消息
+            print(event.source)
             print(f"收到频道消息  {event.source.split('!')[0]}:{event.arguments[0]}")
             text = event.arguments[0]
             # 判断是否是banchobot发送的消息
-            if event.source.find("BanchoBot:") != -1 or event.source.find("ATRI1024:") != -1:
+            if event.source.find("BanchoBot!") != -1 or event.source.find("ATRI1024!") != -1:
                 # 加入房间
                 if text.find("joined in slot") != -1:
                     # 尝试
@@ -769,17 +771,21 @@ class Beatmap:
         try:
             url = 'https://osu.ppy.sh/oauth/token'
             data = {
-                'client_id': self.osu_client_id,
-                'client_secret': self.osu_client_secret,
-                'grant_type': 'client_credentials',
-                'scope': 'public'
+                "client_id": self.osu_client_id,
+                "client_secret": self.osu_client_secret,
+                "grant_type": "client_credentials",
+                "scope": "public"
             }
-            response = requests.post(url, data=data)
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json"
+            }
+            response = requests.post(url, data=data, headers=headers)
             response.raise_for_status()  # 如果请求失败，这会抛出一个异常
             self.osu_token = response.json()['access_token']
-        except:
+        except Exception as e:
             self.osu_token = ""
-            print("获取访问令牌失败")
+            print(f"获取访问令牌失败，错误信息：{e}")
 
     # 使用访问令牌查询
     def get_beatmap_info(self):
@@ -1044,13 +1050,9 @@ class PP:
     def calculate_pp_fully(self, mods):
         try:
             self.mods = mods
-
             beatmap = rosu.Beatmap(path=f"./maps/{self.beatmap_id}.osu")
-
             max_perf = rosu.Performance(mods=mods)
-
             attrs = max_perf.calculate(beatmap)
-
             self.maxpp = attrs.pp
 
             # 计算maxbeatmapcombo
