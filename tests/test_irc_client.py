@@ -1,8 +1,555 @@
 import unittest
 import requests
+import time
 from unittest.mock import patch, MagicMock
 from io import StringIO
 import irc_dlient
+
+class TestMyIRCClient(unittest.TestCase):
+    def setUp(self):
+        # 构造模拟config
+        self.mock_config = MagicMock()
+        self.mock_config.osuclientid = 'test_client_id'
+        self.mock_config.osuclientsecret = 'test_client_secret'
+        self.mock_config.timelimit = '100'  # Example value
+        self.mock_config.starlimit = '5.0'
+        self.mock_config.mpname = 'TestMP'
+        self.mock_config.mppassword = 'testpassword'
+        
+        # 创建Player、Room、Beatmap和PP实例
+        self.player = irc_dlient.Player()
+        self.room = irc_dlient.Room(self.mock_config)
+        self.beatmap = irc_dlient.Beatmap(self.mock_config)
+        self.pp = irc_dlient.PP()
+
+        # 模拟Room类的方法
+        self.room.join_room = MagicMock()
+        self.room.change_password = MagicMock()
+        self.room.get_mp_settings = MagicMock()
+        self.room.create_room = MagicMock()
+        self.room.close_room = MagicMock()
+        self.room.change_host = MagicMock()
+        self.room.start_room = MagicMock()
+        self.room.abort_room = MagicMock()
+        self.room.change_beatmap_to = MagicMock()
+        self.room.change_mods_to_FM = MagicMock()
+        self.room.get_mp_settings = MagicMock()
+        self.room.send_msg = MagicMock()
+        self.room.change_room_id = MagicMock()
+        self.room.save_last_room_id = MagicMock()
+        
+        # 模拟PP类的方法
+        self.pp.calculate_pp_fully = MagicMock(return_value="mock_pp_result")
+        self.pp.calculate_pp_obj = MagicMock(return_value="mock_pp_obj_result")
+        self.pp.get_beatmap_file = MagicMock()
+        
+        # 模拟Beatmap类的方法
+        self.beatmap.get_match_info = MagicMock(return_value={'events': ['match-disbanded']})
+        self.beatmap.get_recent_info = MagicMock(return_value="mock_recent_info")
+        self.beatmap.get_user_id = MagicMock()
+        self.beatmap.get_token = MagicMock()
+        self.beatmap.get_beatmap_info = MagicMock()
+
+        # 模拟Player类的方法
+        self.player.vote_for_abort = MagicMock()
+        self.player.vote_for_start = MagicMock()
+        self.player.vote_for_host_rotate = MagicMock()
+        self.player.vote_for_close_room = MagicMock()
+        self.player.convert_host = MagicMock()
+        self.player.extract_player_name = MagicMock(return_value="BanchoBot114")
+        
+        # 创建MyIRCClient实例，但不实际连接服务器
+        with patch('irc.client.Reactor') as MockReactor:
+            self.mock_reactor = MockReactor.return_value
+            self.mock_server = self.mock_reactor.server.return_value
+            self.client = irc_dlient.MyIRCClient("irc.ppy.sh", 6667, self.mock_config, self.player, self.room, self.beatmap, self.pp)
+
+    def tearDown(self):
+        self.client.stop()
+        time.sleep(0.1)
+
+    @patch('builtins.input', side_effect=["stop"])
+    @patch('builtins.print')
+    def test_on_connect_existing_room(self, mock_print, mock_input):
+        """
+        测试已存在房间
+        """
+        # 模拟获取上一个房间ID
+        self.room.room_id = "#mp_114514"
+        self.room.get_last_room_id = MagicMock(return_value="#mp_114514")
+        self.client.check_last_room_status = MagicMock(return_value=True)
+        
+        # 创建一个模拟的连接和事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        
+        # 调用on_connect
+        self.client.on_connect(mock_connection, mock_event)
+        time.sleep(0.1)
+        
+        # 断言加入房间和修改密码被调用
+        self.room.join_room.assert_called_with(mock_connection, mock_event)
+        self.room.change_password.assert_called_with(mock_connection, mock_event)
+        self.room.get_mp_settings.assert_called_with(mock_connection, mock_event)
+        
+        # 断言已连接事件
+        self.assertTrue(self.client.has_connected.is_set())
+
+
+    @patch('builtins.input', side_effect=["stop"])
+    @patch('builtins.print')
+    def test_on_connect_new_room(self, mock_print, mock_input):
+        """
+        测试新房间
+        """
+        # 模拟获取上一个房间ID为空
+        self.room.get_last_room_id = MagicMock(return_value="")
+        self.client.check_last_room_status = MagicMock(return_value=False)
+        
+        # 创建一个模拟的连接和事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        
+        # 调用on_connect，启动发送消息的线程
+        self.client.on_connect(mock_connection, mock_event)
+        
+        # 等待线程运行，确保input被调用
+        time.sleep(0.2)  # 根据需要调整等待时间
+        
+        # 断言创建房间被调用
+        self.room.create_room.assert_called_with(mock_connection, mock_event)
+        
+        # 断言已连接事件
+        self.assertTrue(self.client.has_connected.is_set())
+        
+
+    @patch('builtins.input', side_effect=["!start", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_start_command(self, mock_print, mock_input):
+        """
+        测试处理!start命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!start"]
+        # 一个叫BanchoBot114的用户发送了!start命令
+        mock_event.source = "收到频道消息  BanchoBot114:!start"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言投票开始游戏的方法被调用
+        self.player.vote_for_start.assert_called_with(mock_connection, mock_event)
+
+    @patch('builtins.input', side_effect=["!abort", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_abort_command(self, mock_print, mock_input):
+        """
+        测试处理!abort命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!abort"]
+        # 一个叫BanchoBot114的用户发送了!abort命令
+        mock_event.source = "收到频道消息  BanchoBot114:!abort"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言投票丢弃游戏的方法被调用
+        self.client.p.vote_for_abort.assert_called_with(mock_connection, mock_event)
+
+    @patch('builtins.input', side_effect=["!skip", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_skip_command(self, mock_print, mock_input):
+        """
+        测试处理!skip命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!skip"]
+        # 一个叫BanchoBot114的用户发送了!skip命令
+        mock_event.source = "收到频道消息  BanchoBot114:!skip"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言投票跳过房主的方法被调用
+        self.client.p.vote_for_host_rotate.assert_called_with(mock_connection, mock_event)
+
+    @patch('builtins.input', side_effect=["!close", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_close_command(self, mock_print, mock_input):
+        """
+        测试处理!close命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!close"]
+        # 一个叫BanchoBot114的用户发送了!close命令
+        mock_event.source = "收到频道消息  BanchoBot114:!close"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言投票关闭房间的方法被调用
+        self.client.p.vote_for_close_room.assert_called_with(mock_connection, mock_event)
+
+    @patch('builtins.input', side_effect=["!queue", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_queue_command(self, mock_print, mock_input):
+        """
+        测试处理!queue命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!queue"]
+        # 一个叫BanchoBot114的用户发送了!queue命令
+        mock_event.source = "收到频道消息  BanchoBot114:!queue"
+        self.client.p.remain_hosts_to_player = MagicMock(return_value=1)
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言转换房主的方法被调用
+        self.client.p.convert_host.assert_called()
+        # 断言剩余人数获取方法被调用
+        self.client.p.remain_hosts_to_player.assert_called_with("收到频道消息  BanchoBot114:")
+        # 断言发送消息的方法被调用
+        self.client.r.send_msg.assert_called_with(mock_connection, mock_event, "你前面剩余人数：1")
+
+    @patch('builtins.input', side_effect=["help", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_help_command(self, mock_print, mock_input):
+        """
+        测试处理help命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["help"]
+        # 一个叫BanchoBot114的用户发送了help命令
+        mock_event.source = "收到频道消息  BanchoBot114:help"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言帮助信息发送的方法被调用
+        self.client.r.send_msg.assert_called_with(mock_connection, mock_event, self.client.r.help())
+
+    @patch('builtins.input', side_effect=["!pr", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_pr_command(self, mock_print, mock_input):
+        """
+        测试处理!pr命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!pr"]
+        # 一个叫BanchoBot114的用户发送了!pr命令
+        mock_event.source = "收到频道消息  BanchoBot114:!pr"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言获取用户ID的方法被调用
+        self.client.b.get_user_id.assert_called_with(mock_event.source.split('!')[0])
+        # 断言获取最近信息的方法被调用
+        self.client.b.get_recent_info.assert_called_with(mock_event.source.split('!')[0])
+        # 断言获取谱面文件的方法被调用
+        self.client.pp.get_beatmap_file.assert_called_with(beatmap_id=self.client.b.pr_beatmap_id)
+        # 断言计算PP对象的方法被调用
+        self.client.pp.calculate_pp_obj.assert_called_with(
+            mods=self.client.b.pr_mods,
+            combo=self.client.b.pr_maxcombo,
+            acc=self.client.b.pr_acc,
+            misses=self.client.b.pr_miss
+        )
+        # 断言发送消息的方法被调用两次
+        self.assertEqual(self.client.r.send_msg.call_count, 2)
+
+    @patch('builtins.input', side_effect=["!ping", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_ping_command(self, mock_print, mock_input):
+        """
+        测试处理!ping命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!ping"]
+        # 一个叫BanchoBot114的用户发送了!ping命令
+        mock_event.source = "收到频道消息  BanchoBot114:!ping"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言发送'ping'响应的方法被调用
+        self.client.r.send_msg.assert_called_with(mock_connection, mock_event, 'pong')
+
+    @patch('builtins.input', side_effect=["!m+", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_m_plus_command(self, mock_print, mock_input):
+        """
+        测试处理!m+命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!m+HardRock"]
+        # 一个叫BanchoBot114的用户发送了!m+HardRock命令
+        mock_event.source = "收到频道消息  BanchoBot114:!m+HardRock"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言获取谱面文件的方法被调用
+        self.client.pp.get_beatmap_file.assert_called_with(beatmap_id=self.client.b.beatmap_id)
+        # 断言计算PP完全的方法被调用
+        self.client.pp.calculate_pp_fully.assert_called_with('HardRock')
+        # 断言发送消息的方法被调用
+        self.client.r.send_msg.assert_called_with(mock_connection, mock_event, self.client.pp.calculate_pp_fully('HardRock'))
+
+    @patch('builtins.input', side_effect=["!about", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_about_command(self, mock_print, mock_input):
+        """
+        测试处理!about命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["!about"]
+        # 一个叫BanchoBot114的用户发送了!about命令
+        mock_event.source = "收到频道消息  BanchoBot114:!about"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言发送关于信息的方法被调用
+        self.client.r.send_msg.assert_called_with(
+            mock_connection, 
+            mock_event, 
+            "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]"
+        )
+
+    @patch('builtins.input', side_effect=["！start", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_start_command_with_full_width_exclamation(self, mock_print, mock_input):
+        """
+        测试处理全角感叹号的!start命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["！start"]  # 全角感叹号
+        # 一个叫BanchoBot114的用户发送了！start命令
+        mock_event.source = "收到频道消息  BanchoBot114:！start"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言投票开始游戏的方法被调用
+        self.client.p.vote_for_start.assert_called_with(mock_connection, mock_event)
+
+    @patch('builtins.input', side_effect=["！i", "stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_start_command_with_full_width_exclamation(self, mock_print, mock_input):
+        """
+        测试处理全角感叹号的!i命令
+        """
+        # 模拟公共消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["！i"]  # 全角感叹号
+        # 一个叫BanchoBot114的用户发送了！i命令
+        mock_event.source = "收到频道消息  BanchoBot114:！i"
+        self.client.b.beatmap_mirror_sayo_url = "https://osu.sayobot.cn/home?search=1"
+        self.client.b.beatmap_mirror_inso_url = "http://inso.link/yukiho/?b=1"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言方法被调用
+        self.client.b.get_token.assert_called()
+        self.client.b.get_beatmap_info.assert_called()
+        self.client.r.send_msg.assert_called_with(mock_connection, mock_event, ' | 0*| [  - ]| bpm: length:0s| ar: cs: od: hp:| [https://osu.sayobot.cn/home?search=1 Sayobot] OR [http://inso.link/yukiho/?b=1 inso]')
+
+    @patch('builtins.print')
+    def test_on_privmsg_handle_room_creation_message_failure(self, mock_print):
+        """
+        测试处理来自BanchoBot的房间创建消息失败的情况（消息格式错误）
+        """
+        # 模拟接收私有消息事件，格式错误
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["Created the tournament match"]  # 缺少房间ID
+        mock_event.source = "BanchoBot114!user@host"
+
+        # 调用on_privmsg
+        self.client.on_privmsg(mock_connection, mock_event)
+        
+        # 断言room_id为空，并检查相关方法的调用
+        self.client.r.change_room_id.assert_called_with("")
+        self.client.r.join_room.assert_called_with(mock_connection, mock_event)
+        self.client.r.change_password.assert_called_with(mock_connection, mock_event)
+        self.client.r.save_last_room_id.assert_called()
+        self.assertTrue(self.client.timer)
+
+    @patch('builtins.print')
+    def test_on_privmsg_handle_non_bancho_bot_message(self, mock_print):
+        """
+        测试处理来自非BanchoBot的私有消息
+        """
+        # 模拟接收私有消息事件，非BanchoBot发送
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["Some random message"]
+        mock_event.source = "收到消息  BanchoBot:Some random message"
+
+        # 调用on_privmsg
+        self.client.on_privmsg(mock_connection, mock_event)
+        
+        # 断言相关方法未被调用
+        self.client.r.change_room_id.assert_not_called()
+        self.client.r.join_room.assert_not_called()
+        self.client.r.change_password.assert_not_called()
+        self.client.r.save_last_room_id.assert_not_called()
+        self.assertFalse(self.client.timer)
+
+    @patch('builtins.input', side_effect=["stop"])
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_exception_in_room_creation(self, mock_print, mock_input):
+        """
+        测试处理来自BanchoBot的房间创建消息时发生异常的情况
+        """
+        # 模拟接收频道消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["joined in slot"]
+        mock_event.source = "收到频道消息  BanchoBot:123 joined in slot"
+
+        # 设置send_msg方法抛出异常
+        self.client.r.send_msg.side_effect = Exception("模拟异常")
+
+        # 调用on_pubmsg
+        try:
+            self.client.on_pubmsg(mock_connection, mock_event)
+        except Exception as e:
+            self.client.stop_periodic_task()
+        
+        # 断言打印了错误信息
+        mock_print.assert_called_with(f'-----------------未知错误---------------------\n模拟异常')
+
+    # @patch('builtins.print')
+    # def test_on_privmsg_handle_multiple_room_creation_messages(self, mock_print):
+    #     """
+    #     测试处理连续多条来自BanchoBot的房间创建消息
+    #     """
+    #     # 模拟接收第一个私有消息事件
+    #     mock_connection1 = MagicMock()
+    #     mock_event1 = MagicMock()
+    #     mock_event1.arguments = ["Created the tournament match (123456)"]
+    #     mock_event1.source = "收到消息  BanchoBot:Created the tournament match (123456)"
+
+    #     self.client.on_privmsg(mock_connection1, mock_event1)
+
+    #     # 断言第一次调用
+    #     self.client.r.change_room_id.assert_called_with("#mp_123456")
+    #     self.client.r.join_room.assert_called_with(mock_connection1, mock_event1)
+    #     self.client.r.change_password.assert_called_with(mock_connection1, mock_event1)
+    #     self.client.r.save_last_room_id.assert_called()
+    #     self.assertTrue(self.client.timer)
+
+    #     # 重置mock
+    #     self.client.r.change_room_id.reset_mock()
+    #     self.client.r.join_room.reset_mock()
+    #     self.client.r.change_password.reset_mock()
+    #     self.client.r.save_last_room_id.reset_mock()
+
+    #     # 模拟接收第二个私有消息事件
+    #     mock_connection2 = MagicMock()
+    #     mock_event2 = MagicMock()
+    #     mock_event2.arguments = ["Created the tournament match (654321)"]
+    #     mock_event2.source = "收到消息  BanchoBot:Created the tournament match (654321)"
+
+    #     self.client.on_privmsg(mock_connection2, mock_event2)
+
+    #     # 断言第二次调用
+    #     self.client.r.change_room_id.assert_called_with("#mp_654321")
+    #     self.client.r.join_room.assert_called_with(mock_connection2, mock_event2)
+    #     self.client.r.change_password.assert_called_with(mock_connection2, mock_event2)
+    #     self.client.r.save_last_room_id.assert_called()
+    #     self.assertTrue(self.client.timer)
+
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_bancho_bot_room_created(self, mock_print):
+        """
+        测试处理来自BanchoBot的房间创建成功消息
+        """
+        # 模拟接收频道消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["Slot 1 Ready https://osu.ppy.sh/u/1234567890 BanchoBot114"]
+        mock_event.source = "收到频道消息  BanchoBot:Slot 1 Ready https://osu.ppy.sh/u/1234567890 BanchoBot114 Host"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言
+        self.assertEqual("BanchoBot114", self.client.p.room_host_list[0])
+        self.assertEqual("BanchoBot114", self.client.p.player_list[0])
+
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_beatmap_changed_message(self, mock_print):
+        """
+        测试处理来自BanchoBot的谱面变化消息
+        """
+        # 模拟接收频道消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["Beatmap changed to (https://osu.ppy.sh/b/1234567890)"]
+        mock_event.source = "收到频道消息  BanchoBot:Beatmap changed to (https://osu.ppy.sh/b/1234567890)"
+        self.client.b.beatmap_id = ""
+
+        self.client.b.check_beatmap_if_out_of_star = MagicMock(return_value=True)
+        self.client.on_pubmsg(mock_connection, mock_event)
+        self.assertEqual("3459231", self.client.b.beatmap_id)
+
+        self.client.b.check_beatmap_if_out_of_star = MagicMock(return_value=False)
+        self.client.b.check_beatmap_if_out_of_time = MagicMock(return_value=True)
+        self.client.on_pubmsg(mock_connection, mock_event)
+        self.assertEqual("3459231", self.client.b.beatmap_id)
+
+        self.client.b.beatmap_id = "1"
+        self.client.b.check_beatmap_if_out_of_star = MagicMock(return_value=False)
+        self.client.b.check_beatmap_if_out_of_time = MagicMock(return_value=False)
+        self.client.on_pubmsg(mock_connection, mock_event)
+        self.assertEqual("1234567890", self.client.b.beatmap_id)
+        self.client.r.send_msg.assert_called()
+
+    @patch('builtins.print')
+    def test_on_pubmsg_handle_room_host_changed_message(self, mock_print):
+        """
+        测试处理来自BanchoBot的房间房主变化消息
+        """
+        # 模拟接收频道消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["BanchoBot114 became the host"]
+        mock_event.source = "收到频道消息  BanchoBot:BanchoBot114 became the host"
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        
+        # 断言
+        self.assertEqual("BanchoBot114", self.client.p.room_host)
 
 class TestConfig(unittest.TestCase):
     @patch('irc_dlient.configparser.ConfigParser')

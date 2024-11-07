@@ -18,7 +18,8 @@ python3 irc_dlient.py
 执行单元测试
 ```bash
 pip install coverage
-coverage run -m unittest discover -s tests
+coverage run -m unittest discover -s tests -v
+coverage report -m
 ```
 
 

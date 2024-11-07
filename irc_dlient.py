@@ -51,10 +51,30 @@ class MyIRCClient:
         self.r = r
         self.b = b
         self.pp = pp
-        self.stop_event = threading.Event()
+        self.connection = None
+        self.event = None
+        self.has_connected = threading.Event()
+        self.reactor_stoped = threading.Event()
+        self.reactor_task = threading.Thread(target=self.process_forever)
+        self.sender_task = threading.Thread(target=(self.send_loop))
 
     def start(self):
-        self.irc_react.process_forever()
+        self.reactor_task.start()
+        print("事件循环线程启动")
+        self.has_connected.wait()
+        self.sender_task.start()
+        print("发送线程启动")
+        self.reactor_task.join()
+        print("事件循环线程结束")
+        self.sender_task.join()
+        print("发送线程结束")
+
+    def process_forever(self):
+        try:
+            while not self.reactor_stoped.is_set():
+                self.irc_react.process_once(timeout=0.2)
+        except Exception as e:
+            print(f"事件循环线程发生错误: {e}")
 
     def reset_all(self):
         # 重置
@@ -154,19 +174,27 @@ class MyIRCClient:
         # 如果房间不存在
         else:
             self.r.create_room(connection, event)
+        self.connection = connection
+        self.event = event
+        self.has_connected.set()
 
-        def send_loop():
-            while not self.stop_event.is_set():
-                message = input(">")
-                self.r.send_msg(connection, event, message)
-
-        threading.Thread(target=(send_loop)).start()
+    def send_loop(self):
+        while True:
+            message = input()
+            if message == "stop":
+                self.stop()
+                break
+            self.r.send_msg(self.connection, self.event, message)
 
     def stop(self):
-        self.stop_event.set()
+        print("IRC客户端已响应停止")
         if self.timer:
             self.stop_periodic_task()
-        print("IRC客户端已停止")
+        print("断开所有连接")
+        self.irc_react.disconnect_all()
+        print("处理最后一个事件")
+        self.irc_react.process_once(timeout=0.2)
+        self.reactor_stoped.set()
 
     def on_privmsg(self, connection, event):
         # 打印接收到的私人消息
@@ -196,7 +224,7 @@ class MyIRCClient:
             print(f"收到频道消息  {event.source.split('!')[0]}:{event.arguments[0]}")
             text = event.arguments[0]
             # 判断是否是banchobot发送的消息
-            if event.source.find("BanchoBot") != -1 or event.source.find("ATRI1024") != -1:
+            if event.source.find("BanchoBot:") != -1 or event.source.find("ATRI1024:") != -1:
                 # 加入房间
                 if text.find("joined in slot") != -1:
                     # 尝试
@@ -388,7 +416,7 @@ class MyIRCClient:
 
             # 手动查看队列，就只返回前面剩余多少人
             if text in ["!queue", "！queue", "!QUEUE", "！QUEUE", "!q", "！q", "!Q", "！Q"]:
-                p.convert_host()
+                self.p.convert_host(connection, event)
                 index = self.p.remain_hosts_to_player(event.source.split('!')[0])
                 self.r.send_msg(connection, event, str(
                     f'你前面剩余人数：{index}'))
@@ -423,30 +451,7 @@ class MyIRCClient:
                         mods=self.b.pr_mods, combo=self.b.pr_maxcombo, acc=self.b.pr_acc, misses=self.b.pr_miss))
 
             # 快速查询谱面得分情况
-            if text.find("!m+") != -1:
-                try:
-                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
-                except:
-                    modslist_str = ""
-                self.pp.get_beatmap_file(beatmap_id=self.b.beatmap_id)
-                self.r.send_msg(connection, event, self.pp.calculate_pp_fully(modslist_str))
-            if text.find("!M+") != -1:
-                try:
-                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
-                except:
-                    modslist_str = ""
-                self.pp.get_beatmap_file(beatmap_id=self.b.beatmap_id)
-                self.r.send_msg(connection, event, self.pp.calculate_pp_fully(modslist_str))
-
-            if text.find("！M+") != -1:
-                try:
-                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
-                except:
-                    modslist_str = ""
-                self.pp.get_beatmap_file(beatmap_id=self.b.beatmap_id)
-                self.r.send_msg(connection, event, self.pp.calculate_pp_fully(modslist_str))
-
-            if text.find("！M+") != -1:
+            if text.find("!m+") != -1 or text.find("！m+") != -1 or text.find("!M+") != -1 or text.find("！M+") != -1:
                 try:
                     modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
                 except:
