@@ -1035,6 +1035,32 @@ class TestPP(unittest.TestCase):
         self.assertEqual(pp.maxbeatmapcombo, 0)
         self.assertEqual(pp.fc95pp, 0)
 
+    @patch('irc_dlient.rosu.Beatmap')
+    def test_calculate_pp_obj_success(self,mock_beatmap):
+        mock_beatmap.return_value = self.beatmap
+
+        pp = irc_dlient.PP()
+        pp.calculate_pp_obj('HDHRDT', 0.98, 5, 1000)
+        self.assertEqual(pp.maxpp, 1100)
+        self.assertEqual(pp.maxbeatmapcombo, 3581)
+        self.assertEqual(pp.fc95pp, 656)
+        self.assertEqual(pp.fc96pp, 698)
+        self.assertEqual(pp.fc97pp, 751)
+        self.assertEqual(pp.fc98pp, 824)
+        self.assertEqual(pp.fc99pp, 931)
+        self.assertEqual(pp.currpp, 24)
+        self.assertEqual(pp.curraimpp, 21)
+        self.assertEqual(pp.currspeedpp, 0)
+        self.assertEqual(pp.curraccpp, 0)
+
+    def test_calculate_pp_obj_failed(self):
+        pp = irc_dlient.PP()
+        pp.calculate_pp_obj('HDHRDT', 0.98, 5, 1000)
+        self.assertEqual(pp.maxpp, 0)
+        self.assertEqual(pp.maxbeatmapcombo, 0)
+        self.assertEqual(pp.currpp, 0)
+        self.assertEqual(pp.curraimpp, 0)
+
 class TestRoom(unittest.TestCase):
     def setUp(self):
         # 构造模拟config
