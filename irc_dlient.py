@@ -37,7 +37,7 @@ class Config:
 
 # 定义IRC客户端类
 class MyIRCClient:
-    def __init__(self, server, port, config):
+    def __init__(self, server, port, config, p, r, b, pp):
         self.irc_react = irc.client.Reactor()
         self.config = config
         self.server = self.irc_react.server()
@@ -47,22 +47,47 @@ class MyIRCClient:
         self.irc_react.add_global_handler("privmsg", self.on_privmsg)
         self.timer = None  # 定义定时器
         self.restarting_task = threading.Thread(target=(self.restart))
+        self.p = p
+        self.r = r
+        self.b = b
+        self.pp = pp
+        self.connection = None
+        self.event = None
+        self.has_connected = threading.Event()
+        self.reactor_stoped = threading.Event()
+        self.reactor_task = threading.Thread(target=self.process_forever)
+        self.sender_task = threading.Thread(target=(self.send_loop))
 
     def start(self):
-        self.irc_react.process_forever()
+        self.reactor_task.start()
+        print("事件循环线程启动")
+        self.has_connected.wait()
+        self.sender_task.start()
+        print("发送线程启动")
+        self.reactor_task.join()
+        print("事件循环线程结束")
+        self.sender_task.join()
+        print("发送线程结束")
+
+    def process_forever(self):
+        try:
+            while not self.reactor_stoped.is_set():
+                self.irc_react.process_once(timeout=0.2)
+        except Exception as e:
+            print(f"事件循环线程发生错误: {e}")
 
     def reset_all(self):
         # 重置
-        p.reset_player_list()
-        p.reset_host_list()
-        p.clear_approved_list()
-        b.clear_cache()
+        self.p.reset_player_list()
+        self.p.reset_host_list()
+        self.p.clear_approved_list()
+        self.b.clear_cache()
 
     def restart(self):
         print(f'尝试重启...{datetime.now()+datetime.timedelta(hours=8)}')
         time.sleep(120)
         self.reset_all()
-        r.create_room(self.server, "")
+        self.r.create_room(self.server, "")
         self.restarting_task = threading.Thread(target=(self.restart))
         print(f'重启完成{datetime.now()+datetime.timedelta(hours=8)}')
 
@@ -71,7 +96,7 @@ class MyIRCClient:
         # Save the Timer object in an instance variable
         self.timer = threading.Timer(60, self.start_periodic_task)
         self.timer.start()
-        self.check_room_status(r.room_id)
+        self.check_room_status(self.r.room_id)
 
     # 停止定时任务
     def stop_periodic_task(self):
@@ -82,23 +107,24 @@ class MyIRCClient:
     def check_last_room_status(self,last_room_id):
         if last_room_id == "":
             return False
-        b.get_token()
         try:
-            text = b.get_match_info(re.findall(r'\d+', last_room_id)[0])
+            self.b.get_token()
+            text = self.b.get_match_info(re.findall(r'\d+', last_room_id)[0])
+            # match-disbanded #比赛关闭
+            if "match-disbanded" in str(text['events']):
+                return False
+            else:
+                self.r.change_room_id(last_room_id)
+                return True
         except:
-            text = ""
-        # match-disbanded #比赛关闭
-        if "match-disbanded" in str(text['events']):
+            print("获取上一个房间失败")
             return False
-        else:
-            r.change_room_id(last_room_id)
-            return True
-
+        
     # 这是检查房间状态的流程 用于定时任务
     def check_room_status(self, room_id):
-        b.get_token()
+        self.b.get_token()
         try:
-            text = b.get_match_info(re.findall(r'\d+', room_id)[0])
+            text = self.b.get_match_info(re.findall(r'\d+', room_id)[0])
         except:
             text = ""
         # match-disbanded #比赛关闭
@@ -107,13 +133,13 @@ class MyIRCClient:
                 self.stop_periodic_task()
                 # 重置
                 p.reset_player_list()
-                p.reset_host_list()
-                p.clear_approved_list()
-                p.approved_host_rotate_list.clear()
-                b.clear_cache()
+                self.p.reset_host_list()
+                self.p.clear_approved_list()
+                self.p.approved_host_rotate_list.clear()
+                self.b.clear_cache()
                 # 尝试重新创建房间
                 try:
-                    r.create_room(self.server, "")
+                    self.r.create_room(self.server, "")
                 except:
                     print("创建房间失败")
                     self.timer.start()
@@ -122,10 +148,10 @@ class MyIRCClient:
 
     def export_json(self):
         result = {}
-        result['player_list'] = p.player_list
-        result['beatmap_name'] = b.beatmap_name
-        result['beatmap_artist'] = b.beatmap_artist
-        result['beatmap_star'] = b.beatmap_star
+        result['player_list'] = self.p.player_list
+        result['beatmap_name'] = self.b.beatmap_name
+        result['beatmap_artist'] = self.b.beatmap_artist
+        result['beatmap_star'] = self.b.beatmap_star
 
         try:
             with open('data.json', 'w', encoding='utf-8') as f:
@@ -135,27 +161,41 @@ class MyIRCClient:
             print("导出json失败")
 
     def on_connect(self, connection, event):
-        last_room_id = r.get_last_room_id()
+        last_room_id = self.r.get_last_room_id()
         
         # 如果房间存在
         if self.check_last_room_status(last_room_id):
-            r.join_room(connection, event)
-            r.change_password(connection, event)
-            r.get_mp_settings(connection, event)
+            self.r.join_room(connection, event)
+            self.r.change_password(connection, event)
+            self.r.get_mp_settings(connection, event)
             try:
                 self.start_periodic_task()
             except:
                 print("定时任务启动失败")
         # 如果房间不存在
         else:
-            r.create_room(connection, event)
+            self.r.create_room(connection, event)
+        self.connection = connection
+        self.event = event
+        self.has_connected.set()
 
-        def send_loop():
-            while True:
-                message = input(">")
-                r.send_msg(connection, event, message)
+    def send_loop(self):
+        while True:
+            message = input()
+            if message == "stop":
+                self.stop()
+                break
+            self.r.send_msg(self.connection, self.event, message)
 
-        threading.Thread(target=(send_loop)).start()
+    def stop(self):
+        print("IRC客户端已响应停止")
+        if self.timer:
+            self.stop_periodic_task()
+        print("断开所有连接")
+        self.irc_react.disconnect_all()
+        print("处理最后一个事件")
+        self.irc_react.process_once(timeout=0.2)
+        self.reactor_stoped.set()
 
     def on_privmsg(self, connection, event):
         # 打印接收到的私人消息
@@ -168,13 +208,13 @@ class MyIRCClient:
             except:
                 romm_id = ""
             # 更新room变量
-            r.change_room_id(romm_id)
+            self.r.change_room_id(romm_id)
             # 加入并监听房间
-            r.join_room(connection, event)
+            self.r.join_room(connection, event)
             # 修改房间密码
-            r.change_password(connection, event)
+            self.r.change_password(connection, event)
             # 保存房间IDs
-            r.save_last_room_id()
+            self.r.save_last_room_id()
             # 启动定时任务
             self.start_periodic_task()
 
@@ -182,10 +222,11 @@ class MyIRCClient:
 
         try:
             # 打印接收到的消息
+            print(event.source)
             print(f"收到频道消息  {event.source.split('!')[0]}:{event.arguments[0]}")
             text = event.arguments[0]
             # 判断是否是banchobot发送的消息
-            if event.source.find("BanchoBot") != -1 or event.source.find("ATRI1024") != -1:
+            if event.source.find("BanchoBot!") != -1 or event.source.find("ATRI1024!") != -1:
                 # 加入房间
                 if text.find("joined in slot") != -1:
                     # 尝试
@@ -197,28 +238,28 @@ class MyIRCClient:
                     print(f'玩家{playerid}加入房间')
                     # 发送欢迎消息
                     if "ATRI1024" not in playerid:
-                        if b.beatmap_length != "" and r.game_start_time != "":
-                            timeleft = int(b.beatmap_length)+10 - \
-                                int((datetime.now()-r.game_start_time).seconds)
+                        if self.b.beatmap_length != "" and self.r.game_start_time != "":
+                            timeleft = int(self.b.beatmap_length)+10 - \
+                                int((datetime.now()-self.r.game_start_time).seconds)
                             text_timeleft = f'| 剩余游玩时间：{timeleft}s 请主人耐心等待哦~'
                         else:
                             timeleft = 0
                         text_Welcome = f'欢迎{playerid}酱~＼(≧▽≦)／ 输入help获取指令详情'
                         if timeleft > 0:
-                            r.send_msg(connection, event,
+                            self.r.send_msg(connection, event,
                                        text_Welcome+text_timeleft)
                         else:
-                            r.send_msg(connection, event, text_Welcome)
+                            self.r.send_msg(connection, event, text_Welcome)
                     # 如果第一次加入房间，更换房主，清空房主队列，设置FM
-                    if len(p.player_list) == 0:
-                        p.reset_host_list()
-                        r.change_host(connection, event, playerid)
-                        r.change_mods_to_FM(connection, event)
+                    if len(self.p.player_list) == 0:
+                        self.p.reset_host_list()
+                        self.r.change_host(connection, event, playerid)
+                        self.r.change_mods_to_FM(connection, event)
                     # 加入房间队列，玩家队列
-                    p.add_host(playerid)
-                    p.add_player(playerid)
-                    print(f'玩家队列{p.player_list}')
-                    print(f'房主队列{p.room_host_list}')
+                    self.p.add_host(playerid)
+                    self.p.add_player(playerid)
+                    print(f'玩家队列{self.p.player_list}')
+                    print(f'房主队列{self.p.room_host_list}')
                     # 输出
                     self.export_json()
                 # 离开房间
@@ -230,11 +271,11 @@ class MyIRCClient:
                         playerid = ""
                     print(f'玩家{playerid}离开房间')
                     # 不移除房主队列
-                    p.remove_player(playerid)
+                    self.p.remove_player(playerid)
                     # 房主离开立刻更换房主
-                    if playerid == p.room_host and len(p.player_list) != 0:
-                        p.host_rotate(connection, event)
-                    print(f'玩家队列{p.player_list}')
+                    if playerid == self.p.room_host and len(self.p.player_list) != 0:
+                        self.p.host_rotate(connection, event)
+                    print(f'玩家队列{self.p.player_list}')
                     # 输出
                     self.export_json()
                 # 修改 on_pubmsg 方法中处理玩家列表的部分
@@ -242,12 +283,12 @@ class MyIRCClient:
                     players = re.findall(r'Slot \d+\s+(?:Not Ready|Ready)\s+(https://osu\.ppy\.sh/u/\d+\s+.+)', text)
                     if players:
                         for player_info in players:
-                            player_id = p.extract_player_name(player_info)
+                            player_id = self.p.extract_player_name(player_info)
                             if player_id:
-                                p.add_host(player_id)
-                                p.add_player(player_id)
-                        print(f'玩家队列{p.player_list}')
-                        print(f'房主队列{p.room_host_list}')
+                                self.p.add_host(player_id)
+                                self.p.add_player(player_id)
+                        print(f'玩家队列{self.p.player_list}')
+                        print(f'房主队列{self.p.room_host_list}')
                         # 输出
                         self.export_json()
                 # 这个是加入房间后要把当前beatmap_id给change一下
@@ -255,7 +296,7 @@ class MyIRCClient:
                     match = re.search(r'https://osu\.ppy\.sh/b/(\d+)', text)
                     if match:
                         beatmap_id = match.group(1)
-                        b.change_beatmap_id(beatmap_id)
+                        self.b.change_beatmap_id(beatmap_id)
 
                 # 谱面变化
                 if text.find("Beatmap changed to") != -1:
@@ -267,28 +308,28 @@ class MyIRCClient:
                         beatmap_url = ""
                         beatmap_id = ""
 
-                    last_beatmap_id = b.beatmap_id
+                    last_beatmap_id = self.b.beatmap_id
                     if last_beatmap_id == "":
                         last_beatmap_id = "3459231"
-                    b.change_beatmap_id(beatmap_id)
+                    self.b.change_beatmap_id(beatmap_id)
                     # 获取谱面信息
-                    b.get_token()
-                    b.get_beatmap_info()
+                    self.b.get_token()
+                    self.b.get_beatmap_info()
 
-                    if b.check_beatmap_if_out_of_star():
-                        r.send_msg(connection, event,
-                                   f'{b.beatmap_star}*>{self.config.starlimit}* 请重新选择')
-                        r.change_beatmap_to(connection, event, last_beatmap_id)
-                        b.change_beatmap_id(last_beatmap_id)
+                    if self.b.check_beatmap_if_out_of_star():
+                        self.r.send_msg(connection, event,
+                                   f'{self.b.beatmap_star}*>{self.config.starlimit}* 请重新选择')
+                        self.r.change_beatmap_to(connection, event, last_beatmap_id)
+                        self.b.change_beatmap_id(last_beatmap_id)
                         return
-                    if b.check_beatmap_if_out_of_time():
-                        r.send_msg(connection, event,
-                                   f'{b.beatmap_length}s>{self.config.timelimit}s 请重新选择')
-                        r.change_beatmap_to(connection, event, last_beatmap_id)
-                        b.change_beatmap_id(last_beatmap_id)
+                    if self.b.check_beatmap_if_out_of_time():
+                        self.r.send_msg(connection, event,
+                                   f'{self.b.beatmap_length}s>{self.config.timelimit}s 请重新选择')
+                        self.r.change_beatmap_to(connection, event, last_beatmap_id)
+                        self.b.change_beatmap_id(last_beatmap_id)
                         return
 
-                    r.send_msg(connection, event, b.return_beatmap_info())
+                    self.r.send_msg(connection, event, self.b.return_beatmap_info())
                     # 输出
                     self.export_json()
 
@@ -296,39 +337,39 @@ class MyIRCClient:
                 if text.find("became the host") != -1:
                     # 尝试
                     try:
-                        p.room_host = re.findall(
+                        self.p.room_host = re.findall(
                             r'.*(?= became the host)', text)[0]
                     except:
-                        p.room_host = ""
-                    print(f'房主变为{p.room_host}')
+                        self.p.room_host = ""
+                    print(f'房主变为{self.p.room_host}')
 
                 # 准备就绪，开始游戏
                 if text.find("All players are ready") != -1:
-                    r.start_room(connection, event)
+                    self.r.start_room(connection, event)
 
                 # 开始游戏
                 if text.find("The match has started") != -1:
                     # 将房主队列第一个人移动到最后
-                    p.host_rotate_pending(connection, event)
-                    print(f'游戏开始，房主队列{p.room_host_list}')
-                    p.clear_approved_list()
+                    self.p.host_rotate_pending(connection, event)
+                    print(f'游戏开始，房主队列{self.p.room_host_list}')
+                    self.p.clear_approved_list()
                     # 获取游戏开始时间
-                    r.set_game_start_time()
+                    self.r.set_game_start_time()
 
                 # 游戏结束,更换房主
                 if text.find("The match has finished") != -1:
                     # 对比房主队列,去除离开的玩家,更新房主队列
-                    p.host_rotate(connection, event)
-                    print(f'游戏结束，房主队列{p.room_host_list}')
+                    self.p.host_rotate(connection, event)
+                    print(f'游戏结束，房主队列{self.p.room_host_list}')
                     # 换了房主以后立即清空投票列表
-                    p.approved_host_rotate_list.clear()
-                    p.clear_approved_list()
+                    self.p.approved_host_rotate_list.clear()
+                    self.p.clear_approved_list()
                     # 发送队列
-                    p.convert_host()
-                    r.send_msg(connection, event, str(
-                        f'当前队列：{p.room_host_list_apprence_text}'))
+                    self.p.convert_host()
+                    self.r.send_msg(connection, event, str(
+                        f'当前队列：{self.p.room_host_list_apprence_text}'))
                     # 重置游戏开始时间
-                    r.reset_game_start_time()
+                    self.r.reset_game_start_time()
 
                 # 游戏被丢弃
                 if text.find("Aborted the match") != -1:
@@ -336,24 +377,24 @@ class MyIRCClient:
                     timeleft = int(b.beatmap_length)+10 - \
                         int((datetime.now()-r.game_start_time).seconds)
                     if timeleft > 0:  # 大于0代表没打，先不更换房主，退回队列
-                        p.reverse_host_pending(connection, event)
+                        self.p.reverse_host_pending(connection, event)
                         print("比赛被丢弃，房主队列退回")
                     else:  # 小于0代表已经打完，更换房主
                         # 对比房主队列,去除离开的玩家,更新房主队列
-                        p.host_rotate(connection, event)
-                    print(f'游戏结束，房主队列{p.room_host_list}')
+                        self.p.host_rotate(connection, event)
+                    print(f'游戏结束，房主队列{self.p.room_host_list}')
                     # 换了房主以后立即清空投票列表
-                    p.approved_host_rotate_list.clear()
-                    p.clear_approved_list()
+                    self.p.approved_host_rotate_list.clear()
+                    self.p.clear_approved_list()
                     # 发送队列
-                    p.convert_host()
-                    r.send_msg(connection, event, str(
+                    self.p.convert_host()
+                    self.r.send_msg(connection, event, str(
                         f'当前队列：{p.room_host_list_apprence_text}'))
                     # 重置游戏开始时间
-                    r.reset_game_start_time()
+                    self.r.reset_game_start_time()
                 # bancho重启
                 if text.find("Bancho will be right back!") != -1:
-                    r.send_msg(connection, event,
+                    self.r.send_msg(connection, event,
                                "Bancho重启中，房间将在2min后自动重启")
                     self.restarting_task.start()
 
@@ -361,108 +402,85 @@ class MyIRCClient:
 
             # 投票丢弃游戏
             if text in ["!abort", "！abort", "!ABORT", "！ABORT"]:
-                p.vote_for_abort(connection, event)
+                self.p.vote_for_abort(connection, event)
 
             # 投票开始游戏
             if text in ["!start", "！start", "!START", "！START"]:
-                p.vote_for_start(connection, event)
+                self.p.vote_for_start(connection, event)
 
             # 投票跳过房主
             if text in ["!skip", "！skip", "!SKIP", "！SKIP"]:
-                p.vote_for_host_rotate(connection, event)
+                self.p.vote_for_host_rotate(connection, event)
 
             # 投票关闭房间s
             if text in ["!close", "！close", "!CLOSE", "！CLOSE"]:
-                p.vote_for_close_room(connection, event)
+                self.p.vote_for_close_room(connection, event)
 
             # 手动查看队列，就只返回前面剩余多少人
             if text in ["!queue", "！queue", "!QUEUE", "！QUEUE", "!q", "！q", "!Q", "！Q"]:
-                p.convert_host()
-                index = p.remain_hosts_to_player(event.source.split('!')[0])
-                r.send_msg(connection, event, str(
+                self.p.convert_host(connection, event)
+                index = self.p.remain_hosts_to_player(event.source.split('!')[0])
+                self.r.send_msg(connection, event, str(
                     f'你前面剩余人数：{index}'))
 
             # 帮助
             if text in ["help", "HELP", "!help", "！help", "!HELP", "！HELP", "!h", "！h", "!H", "！H"]:
-                r.send_msg(connection, event, r.help())
+                self.r.send_msg(connection, event, self.r.help())
 
             # ping
             if text in ["ping", "PING", "!ping", "！ping", "!PING", "！PING"]:
-                r.send_msg(connection, event, r'pong')
+                self.r.send_msg(connection, event, r'pong')
 
             # 快速查询成绩
             if text in ["!pr", "！pr", "!PR", "！PR", "!p", "！p", "!P", "！P"]:
-                b.get_user_id(event.source.split('!')[0])
-                detail_1 = b.get_recent_info(event.source.split('!')[0])
-                pp.get_beatmap_file(beatmap_id=b.pr_beatmap_id)
-                print(b.pr_mods)
-                detail_2 = pp.calculate_pp_obj(
-                    mods=b.pr_mods, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss)
-                r.send_msg(connection, event, detail_1)
-                r.send_msg(connection, event, detail_2)
+                self.b.get_user_id(event.source.split('!')[0])
+                detail_1 = self.b.get_recent_info(event.source.split('!')[0])
+                self.pp.get_beatmap_file(beatmap_id=self.b.pr_beatmap_id)
+                print(self.b.pr_mods)
+                detail_2 = self.pp.calculate_pp_obj(
+                    mods=self.b.pr_mods, combo=self.b.pr_maxcombo, acc=self.b.pr_acc, misses=self.b.pr_miss)
+                self.r.send_msg(connection, event, detail_1)
+                self.r.send_msg(connection, event, detail_2)
 
             # 快速当前谱面成绩
             if text in ["!s", "！s", "!S", "！S"]:
-                b.get_user_id(event.source.split('!')[0])
-                s = b.get_beatmap_score(event.source.split('!')[0])
-                r.send_msg(connection, event, s)
+                self.b.get_user_id(event.source.split('!')[0])
+                s = self.b.get_beatmap_score(event.source.split('!')[0])
+                self.r.send_msg(connection, event, s)
                 if s.find("未查询到") == -1:
-                    pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                    r.send_msg(connection, event, pp.calculate_pp_obj(
-                        mods=b.pr_mods, combo=b.pr_maxcombo, acc=b.pr_acc, misses=b.pr_miss))
+                    self.pp.get_beatmap_file(beatmap_id=self.b.beatmap_id)
+                    self.r.send_msg(connection, event, self.pp.calculate_pp_obj(
+                        mods=self.b.pr_mods, combo=self.b.pr_maxcombo, acc=self.b.pr_acc, misses=self.b.pr_miss))
 
             # 快速查询谱面得分情况
-            if text.find("!m+") != -1:
+            if text.find("!m+") != -1 or text.find("！m+") != -1 or text.find("!M+") != -1 or text.find("！M+") != -1:
                 try:
                     modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
                 except:
                     modslist_str = ""
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
-            if text.find("!M+") != -1:
-                try:
-                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
-                except:
-                    modslist_str = ""
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
-
-            if text.find("！M+") != -1:
-                try:
-                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
-                except:
-                    modslist_str = ""
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
-
-            if text.find("！M+") != -1:
-                try:
-                    modslist_str = re.findall(r'\+(.*)', event.arguments[0])[0]
-                except:
-                    modslist_str = ""
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event, pp.calculate_pp_fully(modslist_str))
+                self.pp.get_beatmap_file(beatmap_id=self.b.beatmap_id)
+                self.r.send_msg(connection, event, self.pp.calculate_pp_fully(modslist_str))
 
             if text in ["!m", "！m", "!M", "！M"]:
-                pp.get_beatmap_file(beatmap_id=b.beatmap_id)
-                r.send_msg(connection, event,pp.calculate_pp_fully(''))
+                self.pp.get_beatmap_file(beatmap_id=self.b.beatmap_id)
+                self.r.send_msg(connection, event,self.pp.calculate_pp_fully(''))
 
             # 快速获取剩余时间 大约10s游戏延迟
             if text in ["!ttl", "！ttl", "!TTL", "！TTL"]:
                 if b.beatmap_length != "" and r.game_start_time != "":
                     timeleft = int(b.beatmap_length)+10 - \
-                        int((datetime.now()-r.game_start_time).seconds)
-                    r.send_msg(connection, event, f'剩余游玩时间：{timeleft}s')
+                        int((datetime.now()-self.r.game_start_time).seconds)
+                    self.r.send_msg(connection, event, f'剩余游玩时间：{timeleft}s')
                 else:
-                    r.send_msg(connection, event, f'剩余游玩时间：未知')
+                    self.r.send_msg(connection, event, f'剩余游玩时间：未知')
 
             if text in ["!i", "！i"]:
-                b.get_token()
-                b.get_beatmap_info()
-                r.send_msg(connection, event, b.return_beatmap_info())
+                self.b.get_token()
+                self.b.get_beatmap_info()
+                self.r.send_msg(connection, event, self.b.return_beatmap_info())
 
             if text in ["!about", "！about", "!ABOUT", "！ABORT"]:
-                r.send_msg(connection, event,
+                self.r.send_msg(connection, event,
                            "[https://github.com/Ohdmire/osu-ircbot-py ATRI高性能bot]")
 
         except Exception as e:
@@ -753,17 +771,21 @@ class Beatmap:
         try:
             url = 'https://osu.ppy.sh/oauth/token'
             data = {
-                'client_id': self.osu_client_id,
-                'client_secret': self.osu_client_secret,
-                'grant_type': 'client_credentials',
-                'scope': 'public'
+                "client_id": self.osu_client_id,
+                "client_secret": self.osu_client_secret,
+                "grant_type": "client_credentials",
+                "scope": "public"
             }
-            response = requests.post(url, data=data)
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json"
+            }
+            response = requests.post(url, data=data, headers=headers)
             response.raise_for_status()  # 如果请求失败，这会抛出一个异常
             self.osu_token = response.json()['access_token']
-        except:
+        except Exception as e:
             self.osu_token = ""
-            print("获取访问令牌失败")
+            print(f"获取访问令牌失败，错误信息：{e}")
 
     # 使用访问令牌查询
     def get_beatmap_info(self):
@@ -1028,13 +1050,9 @@ class PP:
     def calculate_pp_fully(self, mods):
         try:
             self.mods = mods
-
             beatmap = rosu.Beatmap(path=f"./maps/{self.beatmap_id}.osu")
-
             max_perf = rosu.Performance(mods=mods)
-
             attrs = max_perf.calculate(beatmap)
-
             self.maxpp = attrs.pp
 
             # 计算maxbeatmapcombo
@@ -1227,5 +1245,5 @@ if __name__ == '__main__':
     b = Beatmap(config)
     pp = PP()
 
-    client = MyIRCClient(osu_server, osu_port, config)
+    client = MyIRCClient(osu_server, osu_port, config, p, r, b, pp)
     client.start()
