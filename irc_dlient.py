@@ -8,7 +8,7 @@ import configparser
 
 from requests.exceptions import HTTPError
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import rosu_pp_py as rosu
 
@@ -84,12 +84,12 @@ class MyIRCClient:
         self.b.clear_cache()
 
     def restart(self):
-        print(f'尝试重启...{datetime.now()+datetime.timedelta(hours=8)}')
+        print(f'尝试重启...{datetime.now()+timedelta(hours=8)}')
         time.sleep(120)
         self.reset_all()
         self.r.create_room(self.server, "")
         self.restarting_task = threading.Thread(target=(self.restart))
-        print(f'重启完成{datetime.now()+datetime.timedelta(hours=8)}')
+        print(f'重启完成{datetime.now()+timedelta(hours=8)}')
 
     # 定义定时任务,每60s执行一次,检查房间状态
     def start_periodic_task(self):

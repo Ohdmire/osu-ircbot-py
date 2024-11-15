@@ -553,6 +553,26 @@ class TestMyIRCClient(unittest.TestCase):
         # 断言
         self.assertEqual("BanchoBot114", self.client.p.room_host)
 
+    def test_on_pubmsg_handle_bancho_restart_message(self):
+        """
+        测试处理来自BanchoBot的服务器重启消息
+        """
+        # 模拟接收频道消息事件
+        mock_connection = MagicMock()
+        mock_event = MagicMock()
+        mock_event.arguments = ["Bancho will be right back!"]
+        mock_event.source = "BanchoBot!user@ppy.sh"
+
+        # 保存调用on_pubmsg前的restarting_task
+        restarting_task = self.client.restarting_task
+
+        # 调用on_pubmsg
+        self.client.on_pubmsg(mock_connection, mock_event)
+        time.sleep(125)
+        
+        # 断言
+        self.assertNotEqual(restarting_task, self.client.restarting_task)
+        
     @patch('builtins.print')
     def test_on_pubmsg_handle_player_joined_room(self, mock_print):
         """
