@@ -37,4 +37,7 @@ starlimit = 0 #超星限制0默认无限制
 timelimit = 0 #谱面长度限制0默认无限制 单位s
 mpname = 你的mp房名字
 mppassword = 你的mp房密码
+
+[PREDICT]
+url = http://localhost:7777/predict #预测模型地址(可选)
 ```

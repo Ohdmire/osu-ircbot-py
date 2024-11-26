@@ -34,6 +34,8 @@ class Config:
         self.starlimit = self.config['OSU']['starlimit']
         self.timelimit = self.config['OSU']['timelimit']
         self.mppassword = self.config['OSU']['mppassword']
+        self.predict_url = self.config.get('PREDICT', 'url', fallback='')
+
 
 # 定义IRC客户端类
 class MyIRCClient:
@@ -333,6 +335,17 @@ class MyIRCClient:
                     # 输出
                     self.export_json()
 
+                    predict_result = self.b.predict_beatmap_type(self.b.beatmap_id)
+
+                    result_text = ""
+
+                    for key, value in predict_result[self.b.beatmap_id].items():
+                        beatmap_type = key
+                        beatmap_possibility = value * 100
+                        result_text += f'{beatmap_type}的概率为{beatmap_possibility:.2f}% '
+
+                    self.r.send_msg(connection, event, result_text)
+
                 # 房主变化
                 if text.find("became the host") != -1:
                     # 尝试
@@ -478,6 +491,18 @@ class MyIRCClient:
                 self.b.get_token()
                 self.b.get_beatmap_info()
                 self.r.send_msg(connection, event, self.b.return_beatmap_info())
+
+                predict_result = self.b.predict_beatmap_type(self.b.beatmap_id)
+
+                result_text = ""
+
+                for key, value in predict_result[self.b.beatmap_id].items():
+                    beatmap_type = key
+                    beatmap_possibility = value * 100
+                    result_text += f'{beatmap_type}的概率为{beatmap_possibility:.2f}% '
+
+                self.r.send_msg(connection, event, result_text)
+
 
             if text in ["!about", "！about", "!ABOUT", "！ABORT"]:
                 self.r.send_msg(connection, event,
@@ -786,6 +811,16 @@ class Beatmap:
         except Exception as e:
             self.osu_token = ""
             print(f"获取访问令牌失败，错误信息：{e}")
+
+    def predict_beatmap_type(self, beatmap_id):
+    
+        data = {"beatmap_ids": [beatmap_id]}
+        url = self.config.predict_url
+        if url == "":
+            return ""
+        response = requests.post(url, json=data)
+        response.raise_for_status()
+        return response.json()
 
     # 使用访问令牌查询
     def get_beatmap_info(self):
