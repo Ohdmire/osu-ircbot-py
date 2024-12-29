@@ -8,17 +8,17 @@
 
 # 教程
 创建python虚拟环境
-```python
+```bash
 python3 -m venv .venv
 ```
 
 切换到python的环境(windows)
-```powershell
+```bat
 .\.venv\Scripts\activate
 ```
 
 安装Python和必要运行库
-```python
+```bash
 pip install -r requirements.txt
 ```
 运行程序
