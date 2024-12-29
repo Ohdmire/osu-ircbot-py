@@ -7,6 +7,16 @@
 输入help获取吧 咕咕咕
 
 # 教程
+创建python虚拟环境
+```python
+python3 -m venv .venv
+```
+
+切换到python的环境(windows)
+```powershell
+.\.venv\Scripts\activate
+```
+
 安装Python和必要运行库
 ```python
 pip install -r requirements.txt
@@ -33,11 +43,15 @@ nickname = 你的osu名字
 password = 你的irc密码
 
 [OSU]
-starlimit = 0 #超星限制0默认无限制
-timelimit = 0 #谱面长度限制0默认无限制 单位s
+starlimit = 0
+timelimit = 0
 mpname = 你的mp房名字
 mppassword = 你的mp房密码
 
 [PREDICT]
-url = http://localhost:7777/predict #预测模型地址(可选)
+url = http://localhost:7777/predict
 ```
+
+- starlimit 是超星限制0默认无限制
+- timelimit 是谱面长度限制0默认无限制 单位s
+- url = 是预测模型地址(可选)
