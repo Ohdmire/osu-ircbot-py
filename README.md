@@ -1,3 +1,5 @@
+# 推荐使用新项目https://github.com/Ohdmire/osu-ircbot-rust
+
 # osu-ircbot-py
 基于python使用irc自动轮换房主的osu机器人
 
